@@ -1,0 +1,32 @@
+# Build 
+bin/
+obj/
+build/
+
+# Local .NET
+.dotnet/
+.nuget/
+
+# Local EFT/SPT refs
+References/
+
+# IDE/user files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs and crash dumps
+*.log
+*.dmp
+*.mdmp
+crashdump/
+
+# Archives
+*.zip
+*.7z
+*.rar
+

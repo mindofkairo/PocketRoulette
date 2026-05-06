@@ -1,0 +1,104 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <RootNamespace>PocketRoulette</RootNamespace>
+        <AssemblyName>PocketRoulette</AssemblyName>
+        <LangVersion>latest</LangVersion>
+        <Version>1.0.0</Version>
+        <OutputPath>build/</OutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <RefsPath>../../References</RefsPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="BepInEx">
+            <HintPath>$(RefsPath)/BepInEx.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="0Harmony">
+            <HintPath>$(RefsPath)/0Harmony.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="spt-common">
+            <HintPath>$(RefsPath)/spt-common.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="spt-reflection">
+            <HintPath>$(RefsPath)/spt-reflection.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+
+        <Reference Include="Assembly-CSharp">
+            <HintPath>$(RefsPath)/Assembly-CSharp.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="DissonanceVoip">
+            <HintPath>$(RefsPath)/DissonanceVoip.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Assembly-CSharp-firstpass">
+            <HintPath>$(RefsPath)/Assembly-CSharp-firstpass.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Comfort">
+            <HintPath>$(RefsPath)/Comfort.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Comfort.Unity">
+            <HintPath>$(RefsPath)/Comfort.Unity.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Newtonsoft.Json">
+            <HintPath>$(RefsPath)/Newtonsoft.Json.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="ItemComponent.Types">
+            <HintPath>$(RefsPath)/ItemComponent.Types.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+
+        <Reference Include="UnityEngine">
+            <HintPath>$(RefsPath)/UnityEngine.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(RefsPath)/UnityEngine.CoreModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>$(RefsPath)/UnityEngine.PhysicsModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+
+        <Reference Include="Fika.Core" Condition="Exists('$(RefsPath)/Fika.Core.dll')">
+            <HintPath>$(RefsPath)/Fika.Core.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <GamePath Condition="'$(GamePath)' == ''"></GamePath>
+        <PluginPath Condition="'$(PluginPath)' == ''">$(GamePath)/BepInEx/plugins/PocketRoulette</PluginPath>
+    </PropertyGroup>
+
+    <Target Name="CopyToGame" AfterTargets="AfterBuild" Condition="'$(GamePath)' != '' And Exists('$(GamePath)')">
+        <Message Importance="high" Text="Copying client plugin to $(PluginPath)" />
+        <ItemGroup>
+            <PluginFiles Include="$(OutputPath)$(TargetName)$(TargetExt)" />
+            <PluginFiles Include="$(OutputPath)$(TargetName).pdb" Condition="Exists('$(OutputPath)$(TargetName).pdb')" />
+        </ItemGroup>
+        <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginPath)" ContinueOnError="false" />
+        <Message Text="Client plugin copied successfully." Importance="high" />
+    </Target>
+</Project>
