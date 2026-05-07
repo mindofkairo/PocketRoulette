@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace PocketRoulette
 {
-    internal static class FikaBridge
+    public static class FikaBridge
     {
         private static bool _subscribed;
         private static IFikaNetworkManager _registeredManager;

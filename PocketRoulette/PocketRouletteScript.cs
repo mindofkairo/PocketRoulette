@@ -18,6 +18,7 @@ namespace PocketRoulette
         private const float InventoryReadyDelaySeconds = 3f;
         private const string InjectRoute = "/pocketroulette/inject";
         private readonly System.Random _localRandom = CreateLocalRandom();
+        private bool _destroyAfterRoll = true;
 
         private static readonly string[] UltraRareOddsComparisons =
         {
@@ -45,7 +46,7 @@ namespace PocketRoulette
         {
             yield return new WaitForSeconds(InventoryReadyDelaySeconds);
 
-            var config = Plugin.CachedConfig;
+            var config = GetConfig();
             if (config?.ItemPool == null || config.ItemPool.Count == 0)
             {
                 Plugin.LogSource.LogWarning("[PocketRoulette] No config or empty item pool. Skipping.");
@@ -90,7 +91,8 @@ namespace PocketRoulette
                 Plugin.LogSource.LogError($"[PocketRoulette] Error during item injection: {ex}");
             }
 
-            Destroy(this);
+            if (_destroyAfterRoll)
+                Destroy(this);
         }
 
         private List<PoolItem> FilterByMode(List<PoolItem> pool, string mode)
@@ -107,6 +109,21 @@ namespace PocketRoulette
                 default:
                     return pool;
             }
+        }
+
+        private PocketRouletteConfig GetConfig()
+        {
+            try
+            {
+                Plugin.CachedConfig = ConfigLoader.FetchConfig();
+            }
+            catch (Exception ex)
+            {
+                Plugin.LogSource.LogWarning($"config broke, using defaults: {ex.Message}");
+                Plugin.CachedConfig = PocketRouletteConfig.CreateDefault();
+            }
+
+            return Plugin.CachedConfig;
         }
 
         private PoolItem PickWeightedItem(List<PoolItem> items)
@@ -194,21 +211,59 @@ namespace PocketRoulette
                     return;
                 }
 
-                if (!FikaBridge.SendPocketItem(player, rouletteItem, pocketAddress))
+                if (FikaMaybe.Installed())
                 {
-                    Plugin.LogSource.LogError($"[PocketRoulette] Fika sync failed for {poolItem.Name}; not adding locally.");
-                    ShowFailureNotification(config, poolItem);
-                    return;
+                    AddWithFika(player, inventoryController, rouletteItem, pocketAddress, config, poolItem, eligibleItems);
                 }
-
-                inventoryController.AddAndRaiseEvents(rouletteItem, pocketAddress);
-                Plugin.LogSource.LogInfo($"[PocketRoulette] Added {poolItem.Name} to pockets after server sync.");
-                ShowPocketNotification(config, poolItem, eligibleItems);
+                else
+                {
+                    AddWithSpt(player, inventoryController, rouletteItem, pocketAddress, config, poolItem, eligibleItems);
+                }
             }
             catch (Exception ex)
             {
                 Plugin.LogSource.LogError($"[PocketRoulette] Error spawning reward: {ex}");
             }
+        }
+
+        private void AddWithFika(Player player, InventoryController inventoryController, Item rouletteItem, ItemAddress pocketAddress, PocketRouletteConfig config, PoolItem poolItem, List<PoolItem> eligibleItems)
+        {
+            if (!FikaMaybe.SendPocket(player, rouletteItem, pocketAddress))
+            {
+                Plugin.LogSource.LogError($"[PocketRoulette] Fika sync failed for {poolItem.Name}; not adding locally.");
+                ShowFailureNotification(config, poolItem);
+                return;
+            }
+
+            inventoryController.AddAndRaiseEvents(rouletteItem, pocketAddress);
+            Plugin.LogSource.LogInfo($"[PocketRoulette] Added {poolItem.Name} to pockets after server sync.");
+            _destroyAfterRoll = false;
+            StartCoroutine(ShowPocketNotificationThenDestroy(config, poolItem, eligibleItems));
+        }
+
+        private void AddWithSpt(Player player, InventoryController inventoryController, Item rouletteItem, ItemAddress pocketAddress, PocketRouletteConfig config, PoolItem poolItem, List<PoolItem> eligibleItems)
+        {
+            var operation = new GClass3524(
+                inventoryController.method_12(),
+                Array.Empty<Item>(),
+                new Dictionary<Item, ItemAddress> { { rouletteItem, pocketAddress } },
+                new Dictionary<Item, ItemAddress>(),
+                new Dictionary<GInterface171, GClass1802>(),
+                null,
+                player);
+
+            inventoryController.vmethod_1(operation, result =>
+            {
+                if (!result.Succeed)
+                {
+                    Plugin.LogSource.LogError($"[PocketRoulette] SPT add failed for {poolItem.Name}: {result.Error}");
+                    ShowFailureNotification(config, poolItem);
+                    return;
+                }
+
+                Plugin.LogSource.LogInfo($"[PocketRoulette] Added {poolItem.Name} to pockets.");
+                ShowPocketNotification(config, poolItem, eligibleItems);
+            });
         }
 
         private void TryDropAtFeet(Player player, Item rouletteItem, PocketRouletteConfig config, PoolItem poolItem)
@@ -220,7 +275,7 @@ namespace PocketRoulette
                 var dropPosition = playerTransform.position + (playerTransform.forward * 0.75f) + new Vector3(0f, 0.35f, 0f);
 
                 gameWorld.ThrowItem(rouletteItem, player, dropPosition, Quaternion.identity, Vector3.zero, Vector3.zero, true, false, 0f);
-                if (!FikaBridge.SendGroundItem(player, rouletteItem, dropPosition, Quaternion.identity))
+                if (!FikaMaybe.SendGround(player, rouletteItem, dropPosition, Quaternion.identity))
                 {
                     Plugin.LogSource.LogWarning($"[PocketRoulette] Dropped {poolItem.Name} locally, but Fika ground sync failed.");
                 }
@@ -335,6 +390,13 @@ namespace PocketRoulette
             {
                 Plugin.LogSource.LogWarning($"[PocketRoulette] Failed to show notification: {ex.Message}");
             }
+        }
+
+        private IEnumerator ShowPocketNotificationThenDestroy(PocketRouletteConfig config, PoolItem selectedItem, List<PoolItem> eligibleItems)
+        {
+            yield return new WaitForSeconds(0.5f);
+            ShowPocketNotification(config, selectedItem, eligibleItems);
+            Destroy(this);
         }
 
         private void ShowGroundDropNotification(PocketRouletteConfig config, PoolItem poolItem)

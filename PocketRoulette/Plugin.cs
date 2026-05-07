@@ -13,19 +13,10 @@ namespace PocketRoulette
         private void Awake()
         {
             LogSource = Logger;
-
-            try
-            {
-                CachedConfig = ConfigLoader.FetchConfig();
-            }
-            catch (System.Exception ex)
-            {
-                LogSource.LogWarning($"config broke, using defaults: {ex.Message}");
-                CachedConfig = Models.PocketRouletteConfig.CreateDefault();
-            }
+            CachedConfig = Models.PocketRouletteConfig.CreateDefault();
 
             new RaidStartPatch().Enable();
-            FikaBridge.Initialize();
+            FikaMaybe.Init();
 
             LogSource.LogInfo("pocket roulette loaded");
         }

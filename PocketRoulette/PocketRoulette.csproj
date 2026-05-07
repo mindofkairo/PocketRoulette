@@ -76,15 +76,14 @@
             <HintPath>$(RefsPath)/UnityEngine.PhysicsModule.dll</HintPath>
             <Private>false</Private>
         </Reference>
-
-        <Reference Include="Fika.Core" Condition="Exists('$(RefsPath)/Fika.Core.dll')">
-            <HintPath>$(RefsPath)/Fika.Core.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Remove="FikaBridge.cs" />
     </ItemGroup>
 
     <PropertyGroup>
@@ -99,6 +98,8 @@
             <PluginFiles Include="$(OutputPath)$(TargetName).pdb" Condition="Exists('$(OutputPath)$(TargetName).pdb')" />
         </ItemGroup>
         <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginPath)" ContinueOnError="false" />
+        <Delete Files="$(PluginPath)/PocketRoulette.Fika.dll" Condition="!Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')" />
+        <Delete Files="$(PluginPath)/PocketRoulette.Fika.pdb" Condition="!Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')" />
         <Message Text="Client plugin copied successfully." Importance="high" />
     </Target>
 </Project>
