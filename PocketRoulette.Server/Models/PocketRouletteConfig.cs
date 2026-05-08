@@ -5,29 +5,80 @@ namespace PocketRoulette.Server.Models;
 public class PocketRouletteConfig
 {
     [JsonPropertyName("mode")]
+    [JsonPropertyOrder(1)]
     public string Mode { get; set; } = "mixed";
 
-    [JsonPropertyName("itemPool")]
-    public List<PoolItem> ItemPool { get; set; } = [];
+    [JsonPropertyName("itemCount")]
+    [JsonPropertyOrder(2)]
+    public int ItemCount { get; set; } = 1;
+
+    [JsonPropertyName("chancePercent")]
+    [JsonPropertyOrder(3)]
+    public int ChancePercent { get; set; } = 100;
 
     [JsonPropertyName("enableNotification")]
+    [JsonPropertyOrder(4)]
     public bool EnableNotification { get; set; } = true;
 
+    [JsonPropertyName("debugLogging")]
+    [JsonPropertyOrder(5)]
+    public bool DebugLogging { get; set; } = false;
+
+    [JsonPropertyName("allowGroundDrop")]
+    [JsonPropertyOrder(6)]
+    public bool AllowGroundDrop { get; set; } = false;
+
+    [JsonPropertyName("scavEnabled")]
+    [JsonPropertyOrder(7)]
+    public bool ScavEnabled { get; set; } = true;
+
     [JsonPropertyName("pocketMessages")]
+    [JsonPropertyOrder(8)]
     public List<string> PocketMessages { get; set; } = [];
 
     [JsonPropertyName("groundDropMessages")]
+    [JsonPropertyOrder(9)]
     public List<string> GroundDropMessages { get; set; } = [];
 
+    [JsonPropertyName("missedRewardMessages")]
+    [JsonPropertyOrder(10)]
+    public List<string> MissedRewardMessages { get; set; } = [];
+
+    [JsonPropertyName("chanceMissMessages")]
+    [JsonPropertyOrder(11)]
+    public List<string> ChanceMissMessages { get; set; } = [];
+
     [JsonPropertyName("ultraRareMessages")]
+    [JsonPropertyOrder(12)]
     public List<string> UltraRareMessages { get; set; } = [];
+
+    [JsonPropertyName("ultraRareOddsComparisons")]
+    [JsonPropertyOrder(13)]
+    public List<string> UltraRareOddsComparisons { get; set; } = [];
+
+    [JsonPropertyName("failureMessages")]
+    [JsonPropertyOrder(14)]
+    public List<string> FailureMessages { get; set; } = [];
+
+    [JsonPropertyName("multiRollSummaryMessages")]
+    [JsonPropertyOrder(15)]
+    public List<string> MultiRollSummaryMessages { get; set; } = [];
+
+    [JsonPropertyName("itemPool")]
+    [JsonPropertyOrder(100)]
+    public List<PoolItem> ItemPool { get; set; } = [];
 
     public static PocketRouletteConfig CreateDefault()
     {
         return new PocketRouletteConfig
         {
             Mode = "mixed",
+            ItemCount = 1,
+            ChancePercent = 100,
             EnableNotification = true,
+            DebugLogging = false,
+            AllowGroundDrop = true,
+            ScavEnabled = true,
             PocketMessages =
             [
                 "The Pocket Gods smile upon you. Search your pockets...",
@@ -41,10 +92,38 @@ public class PocketRouletteConfig
                 "No room in your pockets! An item clattered to the floor nearby.",
                 "Something fell out of your full pockets. Check the ground!",
             ],
+            MissedRewardMessages =
+            [
+                "Your pockets were full. You missed out on {item}.",
+                "No pocket space. {item} vanished before you could grab it.",
+                "Pocket Roulette rolled {item}, but your pockets were full.",
+            ],
+            ChanceMissMessages =
+            [
+                "Pocket Roulette spun the wheel, but luck was not on your side.",
+                "The pocket gods looked away this raid.",
+                "Nothing appeared in your pockets this time.",
+            ],
             UltraRareMessages =
             [
                 "JACKPOT! Something incredible appeared! (Odds: ~{odds} - rarer than {comparison})",
                 "You lucky rat! You struck gold! (Odds: ~{odds} - {comparison})",
+            ],
+            UltraRareOddsComparisons =
+            [
+                "finding a GPU on the floor of Interchange",
+                "a Scav being friendly",
+                "surviving Labs as a solo",
+                "a raider dropping a keycard",
+                "a peaceful day in Tarkov",
+            ],
+            FailureMessages =
+            [
+                "Pocket Roulette failed to spawn {item}.",
+            ],
+            MultiRollSummaryMessages =
+            [
+                "Pocket Roulette rolled {total} rewards: {pocketCount} in pockets{groundPart}{missedPart}{failedPart}.{bestPart}",
             ],
             ItemPool = GetDefaultItemPool()
         };
@@ -87,11 +166,11 @@ public class PocketRouletteConfig
             new("60098b1705871270cd5352a1", "Emergency Water Ration", 15, "common", 1, 1),
             new("693bfb50d5c25889e701d444", "Nuts Can", 15, "common", 1, 1),
 
-            new("56d59d3ad2720bdb418b4577", "1x 9x19mm Pst gzh", 20, "common", 1, 1),
-            new("56dff3afd2720bba668b4567", "1x 5.45x39mm PS gs", 18, "common", 1, 1),
-            new("560d5e524bdc2d25448b4571", "1x 12/70 7mm Buckshot", 15, "common", 1, 1),
+            new("56d59d3ad2720bdb418b4577", "1x 9x19mm Pst gzh", 20, "common", 1, 1, 1, 45),
+            new("56dff3afd2720bba668b4567", "1x 5.45x39mm PS gs", 18, "common", 1, 1, 1, 45),
+            new("560d5e524bdc2d25448b4571", "1x 12/70 7mm Buckshot", 15, "common", 1, 1, 1, 45),
 
-            new("5449016a4bdc2d6f028b456f", "1 Rouble", 25, "common", 1, 1),
+            new("5449016a4bdc2d6f028b456f", "1 Rouble", 25, "common", 1, 1, 1, 20000),
 
             new("544fb25a4bdc2dfb738b4567", "Aseptic Bandage", 14, "uncommon", 1, 1),
             new("5751a25924597722c463c472", "Army Bandage", 14, "uncommon", 1, 1),
@@ -107,8 +186,8 @@ public class PocketRouletteConfig
             new("61bf83814088ec1a363d7097", "Sewing Kit", 8, "uncommon", 1, 1),
             new("5c06782b86f77426df5407d2", "Capacitors", 8, "uncommon", 1, 1),
 
-            new("5696686a4bdc2da3298b456a", "1 Dollar", 10, "uncommon", 1, 1),
-            new("569668774bdc2da2298b4568", "1 Euro", 9, "uncommon", 1, 1),
+            new("5696686a4bdc2da3298b456a", "1 Dollar", 10, "uncommon", 1, 1, 1, 100),
+            new("569668774bdc2da2298b4568", "1 Euro", 9, "uncommon", 1, 1, 1, 100),
 
             new("590c661e86f7741e566b646a", "Car First Aid Kit", 8, "uncommon", 2, 1),
             new("5d02778e86f774203e7dedbe", "CMS Surgical Kit", 7, "uncommon", 2, 1),
@@ -179,9 +258,20 @@ public class PoolItem
     [JsonPropertyName("height")]
     public int Height { get; set; } = 1;
 
+    [JsonPropertyName("minCount")]
+    public int MinCount { get; set; } = 1;
+
+    [JsonPropertyName("maxCount")]
+    public int MaxCount { get; set; } = 1;
+
     public PoolItem() { }
 
     public PoolItem(string tpl, string name, int weight, string rarity, int width, int height)
+        : this(tpl, name, weight, rarity, width, height, 1, 1)
+    {
+    }
+
+    public PoolItem(string tpl, string name, int weight, string rarity, int width, int height, int minCount, int maxCount)
     {
         Tpl = tpl;
         Name = name;
@@ -189,5 +279,7 @@ public class PoolItem
         Rarity = rarity;
         Width = width;
         Height = height;
+        MinCount = minCount;
+        MaxCount = maxCount;
     }
 }

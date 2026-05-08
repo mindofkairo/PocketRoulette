@@ -6,7 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <OutputType>Library</OutputType>
-        <Version>1.0.0</Version>
+        <Version>1.1.0</Version>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
@@ -30,12 +30,6 @@
             <FilesToCopy Include="$(OutputPath)$(TargetName).pdb" Condition="Exists('$(OutputPath)$(TargetName).pdb')" />
         </ItemGroup>
         <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(ModsDirectoryPath)" ContinueOnError="false" />
-
-        <ItemGroup>
-            <ConfigFiles Include="config/*.json" />
-        </ItemGroup>
-        <Copy SourceFiles="@(ConfigFiles)"
-              DestinationFiles="@(ConfigFiles->'$(ModsDirectoryPath)/config/%(Filename)%(Extension)')" />
 
         <Message Text="Server mod files copied successfully." Importance="high" />
     </Target>
