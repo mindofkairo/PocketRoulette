@@ -23,6 +23,9 @@ namespace PocketRoulette.Models
         [JsonProperty("debugLogging")]
         public bool DebugLogging { get; set; } = false;
 
+        [JsonProperty("allowClientOverrides")]
+        public bool AllowClientOverrides { get; set; } = false;
+
         [JsonProperty("allowGroundDrop")]
         public bool AllowGroundDrop { get; set; } = false;
 
@@ -62,6 +65,7 @@ namespace PocketRoulette.Models
                 ChancePercent = 100,
                 EnableNotification = true,
                 DebugLogging = false,
+                AllowClientOverrides = false,
                 AllowGroundDrop = false,
                 ScavEnabled = true,
                 PocketMessages = new List<string>

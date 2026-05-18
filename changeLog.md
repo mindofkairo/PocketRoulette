@@ -1,3 +1,10 @@
+## v1.2.0
+
+### Added
+- Server authorized BepInEx/F12 client config overrides.
+- New server option `allowClientOverrides`, defaulting to false.
+- New client `Allow Client Config` toggle plus local settings for odds, item count, mode, scav rewards, and ground drops.
+
 ## v1.1.0
 
 ### Added

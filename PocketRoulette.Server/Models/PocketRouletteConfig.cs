@@ -24,44 +24,48 @@ public class PocketRouletteConfig
     [JsonPropertyOrder(5)]
     public bool DebugLogging { get; set; } = false;
 
-    [JsonPropertyName("allowGroundDrop")]
+    [JsonPropertyName("allowClientOverrides")]
     [JsonPropertyOrder(6)]
+    public bool AllowClientOverrides { get; set; } = false;
+
+    [JsonPropertyName("allowGroundDrop")]
+    [JsonPropertyOrder(7)]
     public bool AllowGroundDrop { get; set; } = false;
 
     [JsonPropertyName("scavEnabled")]
-    [JsonPropertyOrder(7)]
+    [JsonPropertyOrder(8)]
     public bool ScavEnabled { get; set; } = true;
 
     [JsonPropertyName("pocketMessages")]
-    [JsonPropertyOrder(8)]
+    [JsonPropertyOrder(9)]
     public List<string> PocketMessages { get; set; } = [];
 
     [JsonPropertyName("groundDropMessages")]
-    [JsonPropertyOrder(9)]
+    [JsonPropertyOrder(10)]
     public List<string> GroundDropMessages { get; set; } = [];
 
     [JsonPropertyName("missedRewardMessages")]
-    [JsonPropertyOrder(10)]
+    [JsonPropertyOrder(11)]
     public List<string> MissedRewardMessages { get; set; } = [];
 
     [JsonPropertyName("chanceMissMessages")]
-    [JsonPropertyOrder(11)]
+    [JsonPropertyOrder(12)]
     public List<string> ChanceMissMessages { get; set; } = [];
 
     [JsonPropertyName("ultraRareMessages")]
-    [JsonPropertyOrder(12)]
+    [JsonPropertyOrder(13)]
     public List<string> UltraRareMessages { get; set; } = [];
 
     [JsonPropertyName("ultraRareOddsComparisons")]
-    [JsonPropertyOrder(13)]
+    [JsonPropertyOrder(14)]
     public List<string> UltraRareOddsComparisons { get; set; } = [];
 
     [JsonPropertyName("failureMessages")]
-    [JsonPropertyOrder(14)]
+    [JsonPropertyOrder(15)]
     public List<string> FailureMessages { get; set; } = [];
 
     [JsonPropertyName("multiRollSummaryMessages")]
-    [JsonPropertyOrder(15)]
+    [JsonPropertyOrder(16)]
     public List<string> MultiRollSummaryMessages { get; set; } = [];
 
     [JsonPropertyName("itemPool")]
@@ -77,7 +81,8 @@ public class PocketRouletteConfig
             ChancePercent = 100,
             EnableNotification = true,
             DebugLogging = false,
-            AllowGroundDrop = true,
+            AllowClientOverrides = false,
+            AllowGroundDrop = false,
             ScavEnabled = true,
             PocketMessages =
             [

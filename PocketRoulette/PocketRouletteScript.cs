@@ -148,7 +148,8 @@ namespace PocketRoulette
         {
             try
             {
-                Plugin.CachedConfig = ConfigLoader.FetchConfig();
+                var serverConfig = ConfigLoader.FetchConfig();
+                Plugin.CachedConfig = ClientConfigManager.Resolve(serverConfig);
             }
             catch (Exception ex)
             {

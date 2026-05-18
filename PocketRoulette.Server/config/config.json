@@ -4,6 +4,7 @@
   "chancePercent": 100,
   "enableNotification": true,
   "debugLogging": false,
+  "allowClientOverrides": false,
   "allowGroundDrop": false,
   "scavEnabled": true,
   "pocketMessages": [

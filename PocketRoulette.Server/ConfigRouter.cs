@@ -79,7 +79,7 @@ public class ConfigRouter : StaticRouter
 
             var config = _reloadConfig();
             _config = config;
-            Console.WriteLine($"[PocketRoulette] Reloaded config - {config.ItemPool.Count} items in pool, mode: {config.Mode}, itemCount: {config.ItemCount}, debugLogging: {config.DebugLogging}");
+            Console.WriteLine($"[PocketRoulette] Reloaded config - {config.ItemPool.Count} items in pool, mode: {config.Mode}, itemCount: {config.ItemCount}, clientOverrides: {config.AllowClientOverrides}, debugLogging: {config.DebugLogging}");
             return new ValueTask<string>("{\"success\":true}");
         }
         catch (Exception ex)

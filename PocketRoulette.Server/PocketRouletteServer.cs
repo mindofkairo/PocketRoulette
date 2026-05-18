@@ -15,7 +15,7 @@ public record ModMetadata : AbstractModMetadata
     public override string ModGuid { get; init; } = "com.kairo.pocketroulette.server";
     public override string Name { get; init; } = "Pocket Roulette (Server)";
     public override string Author { get; init; } = "kairo";
-    public override SemanticVersioning.Version Version { get; init; } = new("1.1.0");
+    public override SemanticVersioning.Version Version { get; init; } = new("1.2.0");
     public override Range SptVersion { get; init; } = new("~4.0.0");
     public override string License { get; init; } = "MIT";
     public override bool? IsBundleMod { get; init; } = false;
@@ -43,7 +43,8 @@ public class PocketRouletteServer(
 
         var config = LoadAndValidateConfig();
 
-        Console.WriteLine($"[PocketRoulette] Loaded config - {config.ItemPool.Count} items in pool, mode: {config.Mode}, itemCount: {config.ItemCount}, debugLogging: {config.DebugLogging}");
+        Console.WriteLine($"[PocketRoulette] Loaded config - {config.ItemPool.Count} items in pool, mode: {config.Mode}, itemCount: {config.ItemCount}, clientOverrides: {config.AllowClientOverrides}, debugLogging: {config.DebugLogging}");
+        WarnIfClientOverridesEnabled(config);
 
         configRouter.SetConfig(config);
         configRouter.SetRefreshConfig(RefreshConfigIfChanged);
@@ -79,7 +80,8 @@ public class PocketRouletteServer(
             try
             {
                 var config = LoadAndValidateConfig();
-                Console.WriteLine($"[PocketRoulette] Auto-reloaded config - {config.ItemPool.Count} items in pool, mode: {config.Mode}, itemCount: {config.ItemCount}, debugLogging: {config.DebugLogging}");
+                Console.WriteLine($"[PocketRoulette] Auto-reloaded config - {config.ItemPool.Count} items in pool, mode: {config.Mode}, itemCount: {config.ItemCount}, clientOverrides: {config.AllowClientOverrides}, debugLogging: {config.DebugLogging}");
+                WarnIfClientOverridesEnabled(config);
                 return config;
             }
             catch (Exception ex)
@@ -94,7 +96,17 @@ public class PocketRouletteServer(
 
     private PocketRouletteConfig ForceReloadConfig()
     {
-        return LoadAndValidateConfig();
+        var config = LoadAndValidateConfig();
+        WarnIfClientOverridesEnabled(config);
+        return config;
+    }
+
+    private static void WarnIfClientOverridesEnabled(PocketRouletteConfig config)
+    {
+        if (!config.AllowClientOverrides)
+            return;
+
+        Console.WriteLine("[PocketRoulette] WARNING: allowClientOverrides is enabled. Players who enable 'Use Client Config' in F12 can control their own Pocket Roulette odds, item pool, messages, and reward behavior. Use this only for solo or trusted groups.");
     }
 
     private static PocketRouletteConfig LoadConfig(string configPath, out bool shouldSave)
@@ -137,6 +149,7 @@ public class PocketRouletteServer(
         changed |= AddMissing(root, "chancePercent", () => config.ChancePercent = defaults.ChancePercent);
         changed |= AddMissing(root, "enableNotification", () => config.EnableNotification = defaults.EnableNotification);
         changed |= AddMissing(root, "debugLogging", () => config.DebugLogging = defaults.DebugLogging);
+        changed |= AddMissing(root, "allowClientOverrides", () => config.AllowClientOverrides = defaults.AllowClientOverrides);
         changed |= AddMissing(root, "allowGroundDrop", () => config.AllowGroundDrop = defaults.AllowGroundDrop);
         changed |= AddMissing(root, "scavEnabled", () => config.ScavEnabled = defaults.ScavEnabled);
         changed |= AddMissing(root, "pocketMessages", () => config.PocketMessages = defaults.PocketMessages);

@@ -16,7 +16,7 @@ It should work with or without Fika. Each player in the raid rolls their own poc
 
 ### Configuration
 
-Edit 'SPT/user/mods/PocketRoulette/config/config.json'.
+Edit `SPT/user/mods/PocketRoulette/config/config.json`.
 
 Stuff you'll probably touch:
 
@@ -25,12 +25,17 @@ Stuff you'll probably touch:
 - chancePercent: 0-100 chance that Pocket Roulette even does anything
 - enableNotification: show or hide the raid-start notification
 - debugLogging: show detailed server logs for item sync and ground registration
+- allowClientOverrides: lets players opt into their own BepInEx/F12 client config instead of the server config
 - allowGroundDrop: if it doesn’t fit in your pockets, drop it at your feet (or discard/skip it)
 - scavEnabled: let your scav also hit the pocket casino
 - itemPool: weighted list of existing EFT item template IDs
 - itemPool.minCount / itemPool.maxCount: stack amount range for that reward, clamped to the item's real max stack size
 
 You can also mess with all the funny messages it spits out if you’re bored.
+
+By default the server config is the authority, which keeps Fika/multiplayer fair. basically, the server and client need each other's consent for a player to use their own F12 config. if the server allows overrides, each client can still choose to use the server config or their own custom config.
+
+Client side item pools and messages live in `BepInEx/plugins/PocketRoulette/PocketRoulette.ClientConfig.json`.
 
 ### Modes
 
@@ -45,3 +50,4 @@ Modes pick a rarity tier first, then use each item's weight inside that rarity.
 ### Known Issues
 
 - If your pockets are already full at raid start, a few items just refuse to spawn in the world for some reason. They vanish into the void instead. No clue why, don’t ask me I’m not smart.
+
