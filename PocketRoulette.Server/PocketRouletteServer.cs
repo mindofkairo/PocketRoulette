@@ -15,7 +15,7 @@ public record ModMetadata : AbstractModMetadata
     public override string ModGuid { get; init; } = "com.kairo.pocketroulette.server";
     public override string Name { get; init; } = "Pocket Roulette (Server)";
     public override string Author { get; init; } = "kairo";
-    public override SemanticVersioning.Version Version { get; init; } = new("1.2.0");
+    public override SemanticVersioning.Version Version { get; init; } = new("1.2.1");
     public override Range SptVersion { get; init; } = new("~4.0.0");
     public override string License { get; init; } = "MIT";
     public override bool? IsBundleMod { get; init; } = false;

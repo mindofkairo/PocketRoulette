@@ -1,3 +1,9 @@
+## v1.2.1
+
+### Fixed
+- Pocket rewards are no longer written directly into the persistent PMC profile before the normal SPT inventory transaction saves them, preventing duplicate item ID errors after raid.
+- The server now refuses to register a pocket reward if its generated item ID already exists in the profile.
+
 ## v1.2.0
 
 ### Added

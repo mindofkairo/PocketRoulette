@@ -105,6 +105,7 @@ public record RegisteredGroundItem(
 [Injectable]
 public class InjectRouter : StaticRouter
 {
+    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, RegisteredPocketItem>> RegisteredPocketItems = new();
     private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, RegisteredGroundItem>> RegisteredGroundItems = new();
     private static bool _debugLogging;
 
@@ -136,52 +137,29 @@ public class InjectRouter : StaticRouter
     {
         try
         {
-            PmcData? pmcData = profileHelper.GetPmcProfile(sessionId);
-
-            if (pmcData?.Inventory?.Items == null)
-            {
-                Console.WriteLine($"[PocketRoulette] Failed to sync item: Could not access PMC inventory for profile {sessionId}");
-                return new ValueTask<string>("{\"success\":false,\"error\":\"profile_not_found\"}");
-            }
-
             if (string.IsNullOrWhiteSpace(request.Id) || string.IsNullOrWhiteSpace(request.Tpl))
             {
                 Console.WriteLine("[PocketRoulette] Failed to sync item: missing id or tpl");
                 return new ValueTask<string>("{\"success\":false,\"error\":\"bad_request\"}");
             }
 
-            if (pmcData.Inventory.Items.Any(item => string.Equals(item.Id.ToString(), request.Id, StringComparison.OrdinalIgnoreCase)))
+            PmcData? pmcData = profileHelper.GetPmcProfile(sessionId);
+            if (pmcData?.Inventory?.Items != null && HasProfileItemId(pmcData, request.Id))
             {
-                DebugLog($"Injected item {request.Id} is already in the PMC profile.");
-                return new ValueTask<string>("{\"success\":true}");
+                Console.WriteLine($"[PocketRoulette] Refusing to register item {request.Id}: item id already exists in the PMC profile.");
+                return new ValueTask<string>("{\"success\":false,\"error\":\"duplicate_profile_item\"}");
             }
 
-            var item = new Item
-            {
-                Id = new MongoId(request.Id),
-                Template = new MongoId(request.Tpl),
-                ParentId = request.ParentId,
-                SlotId = request.SlotId,
-                Location = new ItemLocation
-                {
-                    X = request.Location.X,
-                    Y = request.Location.Y,
-                    R = (ItemRotation)request.Location.R,
-                    IsSearched = request.Location.IsSearched
-                }
-            };
+            var sessionPocketItems = RegisteredPocketItems.GetOrAdd(sessionId.ToString(), _ => new ConcurrentDictionary<string, RegisteredPocketItem>());
+            sessionPocketItems[request.Id] = new RegisteredPocketItem(
+                request.Id,
+                request.Tpl,
+                Math.Max(1, request.StackCount),
+                request.ParentId,
+                request.SlotId,
+                request.Location);
 
-            if (request.StackCount > 1)
-            {
-                item.Upd = new Upd
-                {
-                    StackObjectsCount = request.StackCount
-                };
-            }
-
-            pmcData.Inventory.Items.Add(item);
-
-            DebugLog($"Synced injected item {request.Tpl} to PMC profile.");
+            DebugLog($"Registered pocket item {request.Tpl} ({request.Id}) x{Math.Max(1, request.StackCount)} for raid tracking.");
             return new ValueTask<string>("{\"success\":true}");
         }
         catch (Exception ex)
@@ -219,4 +197,17 @@ public class InjectRouter : StaticRouter
         if (_debugLogging)
             Console.WriteLine($"[PocketRoulette] {message}");
     }
+
+    private static bool HasProfileItemId(PmcData pmcData, string itemId)
+    {
+        return pmcData.Inventory?.Items?.Any(item => string.Equals(item.Id.ToString(), itemId, StringComparison.OrdinalIgnoreCase)) == true;
+    }
 }
+
+public record RegisteredPocketItem(
+    string Id,
+    string Tpl,
+    int StackCount,
+    string ParentId,
+    string SlotId,
+    InjectItemLocation Location);

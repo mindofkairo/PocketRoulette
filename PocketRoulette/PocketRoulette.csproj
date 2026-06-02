@@ -4,7 +4,7 @@
         <RootNamespace>PocketRoulette</RootNamespace>
         <AssemblyName>PocketRoulette</AssemblyName>
         <LangVersion>latest</LangVersion>
-        <Version>1.2.0</Version>
+        <Version>1.2.1</Version>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>

@@ -372,7 +372,7 @@ namespace PocketRoulette
 
                 if (!SyncPocketItemToServer(rouletteItem, pocketAddress))
                 {
-                    Plugin.LogSource.LogError($"[PocketRoulette] Server sync failed for {poolItem.Name}; not adding locally.");
+                    Plugin.LogSource.LogError($"[PocketRoulette] Server registration failed for {poolItem.Name}; not adding locally.");
                     if (showIndividualNotification)
                         ShowFailureNotification(config, poolItem);
 
@@ -629,7 +629,7 @@ namespace PocketRoulette
                 if (!string.IsNullOrWhiteSpace(response) && response.IndexOf("\"success\":false", StringComparison.OrdinalIgnoreCase) >= 0)
                     return false;
 
-                Plugin.LogSource.LogInfo($"[PocketRoulette] Server synced {rouletteItem.TemplateId} at {grid.ID} ({location.x},{location.y},{location.r}).");
+                Plugin.LogSource.LogInfo($"[PocketRoulette] Server registered {rouletteItem.TemplateId} at {grid.ID} ({location.x},{location.y},{location.r}).");
                 return true;
             }
             catch (Exception ex)

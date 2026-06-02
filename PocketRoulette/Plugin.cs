@@ -5,7 +5,7 @@ using PocketRoulette.Patches;
 
 namespace PocketRoulette
 {
-    [BepInPlugin("com.kairo.pocketroulette", "PocketRoulette", "1.2.0")]
+    [BepInPlugin("com.kairo.pocketroulette", "PocketRoulette", "1.2.1")]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource LogSource = null!;
