@@ -16,7 +16,7 @@ It should work with or without Fika. Each player in the raid rolls their own poc
 
 ### Configuration
 
-Edit `SPT/user/mods/PocketRoulette/config/config.json`.
+Edit `SPT_Runtime/user/mods/PocketRoulette/config/config.json` (inside the game install).
 
 Stuff you'll probably touch:
 

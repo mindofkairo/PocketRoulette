@@ -4,7 +4,7 @@
         <RootNamespace>PocketRoulette</RootNamespace>
         <AssemblyName>PocketRoulette</AssemblyName>
         <LangVersion>latest</LangVersion>
-        <Version>1.2.0</Version>
+        <Version>1.3.0</Version>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
@@ -14,29 +14,46 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <RefsPath>../../References</RefsPath>
+        <RefsPath Condition="'$(RefsPath)' == ''">../../References</RefsPath>
+        <GameManagedPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/EscapeFromTarkov_Data/Managed/Assembly-CSharp.dll')">$(GamePath)/EscapeFromTarkov_Data/Managed</GameManagedPath>
+        <GameManagedPath Condition="'$(GameManagedPath)' == '' And '$(GamePath)' != '' And Exists('$(GamePath)/SPT_Runtime/Assembly-CSharp.dll')">$(GamePath)/SPT_Runtime</GameManagedPath>
     </PropertyGroup>
 
     <ItemGroup>
         <Reference Include="BepInEx">
-            <HintPath>$(RefsPath)/BepInEx.dll</HintPath>
+            <HintPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/core/BepInEx.dll')">$(GamePath)/BepInEx/core/BepInEx.dll</HintPath>
+            <HintPath Condition="('$(GamePath)' == '' Or !Exists('$(GamePath)/BepInEx/core/BepInEx.dll')) And Exists('$(RefsPath)/BepInEx.dll')">$(RefsPath)/BepInEx.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="0Harmony">
-            <HintPath>$(RefsPath)/0Harmony.dll</HintPath>
+            <HintPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/core/0Harmony.dll')">$(GamePath)/BepInEx/core/0Harmony.dll</HintPath>
+            <HintPath Condition="('$(GamePath)' == '' Or !Exists('$(GamePath)/BepInEx/core/0Harmony.dll')) And Exists('$(RefsPath)/0Harmony.dll')">$(RefsPath)/0Harmony.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="BepInEx.Harmony">
+            <HintPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/core/BepInEx.Harmony.dll')">$(GamePath)/BepInEx/core/BepInEx.Harmony.dll</HintPath>
+            <HintPath Condition="('$(GamePath)' == '' Or !Exists('$(GamePath)/BepInEx/core/BepInEx.Harmony.dll')) And Exists('$(RefsPath)/BepInEx.Harmony.dll')">$(RefsPath)/BepInEx.Harmony.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="spt-common">
-            <HintPath>$(RefsPath)/spt-common.dll</HintPath>
+            <HintPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/plugins/spt/spt-common.dll')">$(GamePath)/BepInEx/plugins/spt/spt-common.dll</HintPath>
+            <HintPath Condition="('$(GamePath)' == '' Or !Exists('$(GamePath)/BepInEx/plugins/spt/spt-common.dll')) And Exists('$(RefsPath)/spt-common.dll')">$(RefsPath)/spt-common.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="spt-reflection">
-            <HintPath>$(RefsPath)/spt-reflection.dll</HintPath>
+            <HintPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/plugins/spt/spt-reflection.dll')">$(GamePath)/BepInEx/plugins/spt/spt-reflection.dll</HintPath>
+            <HintPath Condition="('$(GamePath)' == '' Or !Exists('$(GamePath)/BepInEx/plugins/spt/spt-reflection.dll')) And Exists('$(RefsPath)/spt-reflection.dll')">$(RefsPath)/spt-reflection.dll</HintPath>
             <Private>false</Private>
         </Reference>
 
         <Reference Include="Assembly-CSharp">
-            <HintPath>$(RefsPath)/Assembly-CSharp.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Assembly-CSharp.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Assembly-CSharp.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="ItemTemplate.Types">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/ItemTemplate.Types.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/ItemTemplate.Types.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="DissonanceVoip">
@@ -44,36 +61,49 @@
             <Private>false</Private>
         </Reference>
         <Reference Include="Assembly-CSharp-firstpass">
-            <HintPath>$(RefsPath)/Assembly-CSharp-firstpass.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Assembly-CSharp-firstpass.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Assembly-CSharp-firstpass.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="Comfort">
-            <HintPath>$(RefsPath)/Comfort.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Comfort.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Comfort.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="Comfort.Unity">
-            <HintPath>$(RefsPath)/Comfort.Unity.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Comfort.Unity.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Comfort.Unity.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="Newtonsoft.Json">
-            <HintPath>$(RefsPath)/Newtonsoft.Json.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Newtonsoft.Json.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Newtonsoft.Json.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="ItemComponent.Types">
-            <HintPath>$(RefsPath)/ItemComponent.Types.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/ItemComponent.Types.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/ItemComponent.Types.dll</HintPath>
             <Private>false</Private>
         </Reference>
 
         <Reference Include="UnityEngine">
-            <HintPath>$(RefsPath)/UnityEngine.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.CoreModule">
-            <HintPath>$(RefsPath)/UnityEngine.CoreModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.CoreModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.GridModule">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.GridModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.GridModule.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.PhysicsModule">
-            <HintPath>$(RefsPath)/UnityEngine.PhysicsModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.PhysicsModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.PhysicsModule.dll</HintPath>
             <Private>false</Private>
         </Reference>
     </ItemGroup>

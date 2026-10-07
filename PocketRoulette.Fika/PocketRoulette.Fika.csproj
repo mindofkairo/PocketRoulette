@@ -4,13 +4,19 @@
         <RootNamespace>PocketRoulette</RootNamespace>
         <AssemblyName>PocketRoulette.Fika</AssemblyName>
         <LangVersion>latest</LangVersion>
-        <Version>1.2.0</Version>
+        <Version>1.3.0</Version>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
 
     <PropertyGroup>
-        <RefsPath>../../References</RefsPath>
+        <RefsPath Condition="'$(RefsPath)' == ''">../../References</RefsPath>
+        <GameManagedPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/EscapeFromTarkov_Data/Managed/Assembly-CSharp.dll')">$(GamePath)/EscapeFromTarkov_Data/Managed</GameManagedPath>
+        <GameManagedPath Condition="'$(GameManagedPath)' == '' And '$(GamePath)' != '' And Exists('$(GamePath)/SPT_Runtime/Assembly-CSharp.dll')">$(GamePath)/SPT_Runtime</GameManagedPath>
+        <GamePath Condition="'$(GamePath)' == ''"></GamePath>
+        <PluginPath Condition="'$(PluginPath)' == ''">$(GamePath)/BepInEx/plugins/PocketRoulette</PluginPath>
+        <FikaAssemblyPath Condition="'$(FikaAssemblyPath)' == '' And '$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')">$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll</FikaAssemblyPath>
+        <FikaAssemblyPath Condition="'$(FikaAssemblyPath)' == '' And Exists('$(RefsPath)/Fika.Core.dll')">$(RefsPath)/Fika.Core.dll</FikaAssemblyPath>
     </PropertyGroup>
 
     <ItemGroup>
@@ -23,35 +29,35 @@
 
     <ItemGroup>
         <Reference Include="BepInEx">
-            <HintPath>$(RefsPath)/BepInEx.dll</HintPath>
+            <HintPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/core/BepInEx.dll')">$(GamePath)/BepInEx/core/BepInEx.dll</HintPath>
+            <HintPath Condition="('$(GamePath)' == '' Or !Exists('$(GamePath)/BepInEx/core/BepInEx.dll')) And Exists('$(RefsPath)/BepInEx.dll')">$(RefsPath)/BepInEx.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="Assembly-CSharp">
-            <HintPath>$(RefsPath)/Assembly-CSharp.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Assembly-CSharp.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Assembly-CSharp.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="Comfort">
-            <HintPath>$(RefsPath)/Comfort.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Comfort.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Comfort.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="Fika.Core">
-            <HintPath>$(RefsPath)/Fika.Core.dll</HintPath>
+            <HintPath>$(FikaAssemblyPath)</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine">
-            <HintPath>$(RefsPath)/UnityEngine.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.CoreModule">
-            <HintPath>$(RefsPath)/UnityEngine.CoreModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.CoreModule.dll</HintPath>
             <Private>false</Private>
         </Reference>
     </ItemGroup>
-
-    <PropertyGroup>
-        <GamePath Condition="'$(GamePath)' == ''"></GamePath>
-        <PluginPath Condition="'$(PluginPath)' == ''">$(GamePath)/BepInEx/plugins/PocketRoulette</PluginPath>
-    </PropertyGroup>
 
     <Target Name="CopyToGame" AfterTargets="AfterBuild" Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')">
         <ItemGroup>

@@ -4,28 +4,29 @@ using System.Text.Json;
 using PocketRoulette.Server.Models;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.Helpers;
+using SPTarkov.Server.Core.Helpers.Profile;
+using SPTarkov.Server.Core.Helpers.Server;
 using SPTarkov.Server.Core.Models.Spt.Mod;
 using Range = SemanticVersioning.Range;
 
 namespace PocketRoulette.Server;
 
-public record ModMetadata : AbstractModMetadata
+public record ModMetadata : IModMetadata
 {
-    public override string ModGuid { get; init; } = "com.kairo.pocketroulette.server";
-    public override string Name { get; init; } = "Pocket Roulette (Server)";
-    public override string Author { get; init; } = "kairo";
-    public override SemanticVersioning.Version Version { get; init; } = new("1.2.0");
-    public override Range SptVersion { get; init; } = new("~4.0.0");
-    public override string License { get; init; } = "MIT";
-    public override bool? IsBundleMod { get; init; } = false;
-    public override Dictionary<string, Range>? ModDependencies { get; init; }
-    public override string? Url { get; init; }
-    public override List<string>? Contributors { get; init; }
-    public override List<string>? Incompatibilities { get; init; }
+    public string ModGuid { get; init; } = "com.kairo.pocketroulette.server";
+    public string Name { get; init; } = "Pocket Roulette (Server)";
+    public string Author { get; init; } = "kairo";
+    public SemanticVersioning.Version Version { get; init; } = new("1.3.0");
+    public Range SptVersion { get; init; } = new("^4.1.0");
+    public string License { get; init; } = "MIT";
+    public bool HasPrepatcher { get; init; } = false;
+    public Dictionary<string, Range>? ModDependencies { get; init; }
+    public string? Url { get; init; }
+    public List<string>? Contributors { get; init; }
+    public List<string>? Incompatibilities { get; init; }
 }
 
-[Injectable(TypePriority = OnLoadOrder.PostDBModLoader + 1)]
+[Injectable(TypePriority = OnLoadOrder.PostLoad)]
 public class PocketRouletteServer(
     ModHelper modHelper,
     ConfigRouter configRouter,
@@ -35,8 +36,10 @@ public class PocketRouletteServer(
     private DateTime _lastConfigWriteTimeUtc = DateTime.MinValue;
     private PocketRouletteConfig? _currentConfig;
 
-    public Task OnLoad()
+    public Task OnLoadAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var assembly = Assembly.GetExecutingAssembly();
         var modPath = modHelper.GetAbsolutePathToModFolder(assembly);
         _configPath = Path.Combine(modPath, "config", "config.json");

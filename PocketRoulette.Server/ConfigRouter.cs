@@ -40,17 +40,19 @@ public class ConfigRouter : StaticRouter
         [
             new RouteAction<EmptyRequestData>(
                 "/pocketroulette/config",
-                (url, info, sessionId, output) => GetConfig()
+                (url, info, sessionId, output, cancellationToken) => GetConfig(cancellationToken)
             ),
             new RouteAction<EmptyRequestData>(
                 "/pocketroulette/reload-config",
-                (url, info, sessionId, output) => ReloadConfig()
+                (url, info, sessionId, output, cancellationToken) => ReloadConfig(cancellationToken)
             )
         ];
     }
 
-    private static ValueTask<string> GetConfig()
+    private static ValueTask<string> GetConfig(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         try
         {
             if (_refreshConfig != null)
@@ -70,8 +72,10 @@ public class ConfigRouter : StaticRouter
         return new ValueTask<string>(json);
     }
 
-    private static ValueTask<string> ReloadConfig()
+    private static ValueTask<string> ReloadConfig(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         try
         {
             if (_reloadConfig == null)

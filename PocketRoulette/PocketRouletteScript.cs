@@ -6,6 +6,7 @@ using Comfort.Common;
 using EFT;
 using EFT.Communications;
 using EFT.InventoryLogic;
+using EFT.InventoryLogic.Operations;
 using Newtonsoft.Json;
 using PocketRoulette.Models;
 using SPT.Common.Http;
@@ -306,7 +307,7 @@ namespace PocketRoulette
         {
             try
             {
-                var itemFactory = Singleton<ItemFactoryClass>.Instance;
+                var itemFactory = Singleton<ItemFactory>.Instance;
                 if (itemFactory != null)
                 {
                     return itemFactory.CreateItem(MongoID.Generate(), templateId, null);
@@ -363,7 +364,7 @@ namespace PocketRoulette
                     return HandleNoPocketSpace(player, rouletteItem, config, poolItem, stackCount, showIndividualNotification);
                 }
 
-                var addResult = InteractionsHandlerClass.Add(rouletteItem, pocketAddress, inventoryController, true);
+                var addResult = ItemManipulator.Add(rouletteItem, pocketAddress, inventoryController, true);
                 if (addResult.Failed)
                 {
                     Plugin.LogSource.LogWarning($"[PocketRoulette] EFT rejected pocket add for {poolItem.Name}: {addResult.Error}.");
@@ -445,18 +446,18 @@ namespace PocketRoulette
             _waitingForSptAdd = true;
             _waitingForSptResult = rewardResult;
 
-            var operation = new GClass3524(
-                inventoryController.method_12(),
+            var operation = new ChangeItemsOperation(
+                inventoryController.GetAndIncrementNextOperationId(),
                 Array.Empty<Item>(),
                 new Dictionary<Item, ItemAddress> { { rouletteItem, pocketAddress } },
                 new Dictionary<Item, ItemAddress>(),
-                new Dictionary<GInterface171, GClass1802>(),
+                new Dictionary<IItemInfoContainer, ItemInfo>(),
                 null,
                 player);
 
             try
             {
-                inventoryController.vmethod_1(operation, operationResult =>
+                inventoryController.Execute(operation, operationResult =>
                 {
                     if (!operationResult.Succeed)
                     {
@@ -584,14 +585,11 @@ namespace PocketRoulette
 
         private ItemAddress FindPocketAddress(Item rouletteItem, CompoundItem pocketsItem)
         {
-            foreach (var container in pocketsItem.Containers)
+            foreach (var grid in pocketsItem.Grids)
             {
-                if (container is StashGridClass grid)
-                {
-                    var address = grid.FindLocationForItem(rouletteItem);
-                    if (address != null)
-                        return address;
-                }
+                var address = grid.FindLocationForItem(rouletteItem);
+                if (address != null)
+                    return address;
             }
 
             return null;
@@ -601,7 +599,7 @@ namespace PocketRoulette
         {
             try
             {
-                if (!(pocketAddress is GClass3393 gridAddress))
+                if (!(pocketAddress is GridItemAddress gridAddress))
                 {
                     Plugin.LogSource.LogError($"[PocketRoulette] Unexpected pocket address type: {pocketAddress.GetType().FullName}");
                     return false;
@@ -673,7 +671,7 @@ namespace PocketRoulette
                     return;
                 }
 
-                NotificationManagerClass.DisplayMessageNotification(
+                NotificationManager.DisplayMessageNotification(
                     message,
                     ENotificationDurationType.Long,
                     ENotificationIconType.Default,
@@ -729,7 +727,7 @@ namespace PocketRoulette
                     .Replace("{bestFinds}", highlights.Count > 0 ? string.Join(", ", highlights) : "")
                     .Replace("{bestPart}", highlights.Count > 0 ? $" Best finds: {string.Join(", ", highlights)}." : "");
 
-                NotificationManagerClass.DisplayMessageNotification(
+                NotificationManager.DisplayMessageNotification(
                     message,
                     ENotificationDurationType.Long,
                     ENotificationIconType.Default,
@@ -783,7 +781,7 @@ namespace PocketRoulette
             if (text.IndexOf("feet", StringComparison.OrdinalIgnoreCase) < 0 && text.IndexOf("ground", StringComparison.OrdinalIgnoreCase) < 0)
                 text = $"{text} It landed at your feet.";
 
-            NotificationManagerClass.DisplayMessageNotification(
+            NotificationManager.DisplayMessageNotification(
                 text,
                 ENotificationDurationType.Long,
                 ENotificationIconType.Default,
@@ -803,7 +801,7 @@ namespace PocketRoulette
             if (!MessageMentionsItem(text, poolItem))
                 text = $"{text} ({FormatRewardName(poolItem, stackCount)})";
 
-            NotificationManagerClass.DisplayMessageNotification(
+            NotificationManager.DisplayMessageNotification(
                 text,
                 ENotificationDurationType.Long,
                 ENotificationIconType.Default,
@@ -820,7 +818,7 @@ namespace PocketRoulette
                 ? PickRandom(config.ChanceMissMessages)
                 : "Pocket Roulette spun the wheel, but luck was not on your side.";
 
-            NotificationManagerClass.DisplayMessageNotification(
+            NotificationManager.DisplayMessageNotification(
                 message,
                 ENotificationDurationType.Long,
                 ENotificationIconType.Default,
@@ -836,7 +834,7 @@ namespace PocketRoulette
                 ? PickRandom(config.FailureMessages)
                 : "Pocket Roulette failed to spawn {item}.";
 
-            NotificationManagerClass.DisplayMessageNotification(
+            NotificationManager.DisplayMessageNotification(
                 message.Replace("{item}", FormatRewardName(poolItem, 1)),
                 ENotificationDurationType.Long,
                 ENotificationIconType.Default,

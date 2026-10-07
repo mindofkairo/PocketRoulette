@@ -2,10 +2,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.Helpers;
+using SPTarkov.Server.Core.Helpers.Profile;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
@@ -123,17 +124,19 @@ public class InjectRouter : StaticRouter
         [
             new RouteAction<InjectItemRequest>(
                 "/pocketroulette/inject",
-                (url, request, sessionId, output) => InjectItem(profileHelper, request, sessionId)
+                (url, request, sessionId, output, cancellationToken) => InjectItem(profileHelper, request, sessionId, cancellationToken)
             ),
             new RouteAction<RegisterGroundItemRequest>(
                 "/pocketroulette/register-ground",
-                (url, request, sessionId, output) => RegisterGroundItem(request, sessionId)
+                (url, request, sessionId, output, cancellationToken) => RegisterGroundItem(request, sessionId, cancellationToken)
             )
         ];
     }
 
-    private static ValueTask<string> InjectItem(ProfileHelper profileHelper, InjectItemRequest request, MongoId sessionId)
+    private static ValueTask<string> InjectItem(ProfileHelper profileHelper, InjectItemRequest request, MongoId sessionId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         try
         {
             PmcData? pmcData = profileHelper.GetPmcProfile(sessionId);
@@ -191,8 +194,10 @@ public class InjectRouter : StaticRouter
         }
     }
 
-    private static ValueTask<string> RegisterGroundItem(RegisterGroundItemRequest request, MongoId sessionId)
+    private static ValueTask<string> RegisterGroundItem(RegisterGroundItemRequest request, MongoId sessionId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         try
         {
             if (string.IsNullOrWhiteSpace(request.Id) || string.IsNullOrWhiteSpace(request.Tpl))

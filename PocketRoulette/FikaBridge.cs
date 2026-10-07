@@ -64,7 +64,7 @@ namespace PocketRoulette
             if (_registeredManager == null || !Singleton<IFikaNetworkManager>.Instantiated)
                 return true;
 
-            if (!(owner is FikaPlayer fikaOwner) || !(address is GClass3393 gridAddress))
+            if (!(owner is FikaPlayer fikaOwner) || !(address is GridItemAddress gridAddress))
                 return true;
 
             try
@@ -177,9 +177,9 @@ namespace PocketRoulette
                 if (!(pocketsSlot?.ContainedItem is CompoundItem pocketsItem))
                     return;
 
-                foreach (var container in pocketsItem.Containers)
+                foreach (var grid in pocketsItem.Grids)
                 {
-                    if (container is StashGridClass grid && grid.ID == packet.SlotId)
+                    if (grid.ID == packet.SlotId)
                     {
                         var location = new LocationInGrid(packet.X, packet.Y, (ItemRotation)packet.Rotation);
                         player.InventoryController.AddAndRaiseEvents(packet.Item, grid.CreateItemAddress(location));
