@@ -4,7 +4,7 @@
         <RootNamespace>PocketRoulette</RootNamespace>
         <AssemblyName>PocketRoulette.Fika</AssemblyName>
         <LangVersion>latest</LangVersion>
-        <Version>1.3.0</Version>
+        <Version>1.9.1</Version>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
@@ -43,6 +43,11 @@
             <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Comfort.dll</HintPath>
             <Private>false</Private>
         </Reference>
+        <Reference Include="DissonanceVoip">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/DissonanceVoip.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/DissonanceVoip.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
         <Reference Include="Fika.Core">
             <HintPath>$(FikaAssemblyPath)</HintPath>
             <Private>false</Private>
@@ -59,7 +64,7 @@
         </Reference>
     </ItemGroup>
 
-    <Target Name="CopyToGame" AfterTargets="AfterBuild" Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')">
+    <Target Name="CopyToGame" AfterTargets="AfterBuild" Condition="'$(DeployToGame)' != 'false' And '$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')">
         <ItemGroup>
             <PluginFiles Include="$(OutputPath)$(TargetName)$(TargetExt)" />
             <PluginFiles Include="$(OutputPath)$(TargetName).pdb" Condition="Exists('$(OutputPath)$(TargetName).pdb')" />
@@ -67,3 +72,4 @@
         <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginPath)" ContinueOnError="false" />
     </Target>
 </Project>
+

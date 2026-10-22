@@ -1,95 +1,32 @@
 using System.Text.Json;
-using PocketRoulette.Server.Models;
+using PocketRoulette.Models;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Utils;
 
 namespace PocketRoulette.Server;
 
 [Injectable]
-public class ConfigRouter : StaticRouter
-{
-    private static PocketRouletteConfig? _config;
-    private static Func<PocketRouletteConfig>? _refreshConfig;
-    private static Func<PocketRouletteConfig>? _reloadConfig;
-
-    public ConfigRouter(JsonUtil jsonUtil) : base(jsonUtil, GetCustomRoutes())
+public class ConfigRouter(JsonUtil jsonUtil, ConfigService configs) : StaticRouter(jsonUtil,
+[
+    new RouteAction<EmptyRequestData>("/pocketroulette/config", (url, request, session, output, ct) =>
     {
-    }
-
-    public void SetConfig(PocketRouletteConfig config)
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(JsonSerializer.Serialize(configs.Get()));
+    }),
+    new RouteAction<EmptyRequestData>("/pocketroulette/reload-config", (url, request, session, output, ct) =>
     {
-        _config = config;
-    }
-
-    public void SetReloadConfig(Func<PocketRouletteConfig> reloadConfig)
-    {
-        _reloadConfig = reloadConfig;
-    }
-
-    public void SetRefreshConfig(Func<PocketRouletteConfig> refreshConfig)
-    {
-        _refreshConfig = refreshConfig;
-    }
-
-    private static List<RouteAction> GetCustomRoutes()
-    {
-        return
-        [
-            new RouteAction<EmptyRequestData>(
-                "/pocketroulette/config",
-                (url, info, sessionId, output, cancellationToken) => GetConfig(cancellationToken)
-            ),
-            new RouteAction<EmptyRequestData>(
-                "/pocketroulette/reload-config",
-                (url, info, sessionId, output, cancellationToken) => ReloadConfig(cancellationToken)
-            )
-        ];
-    }
-
-    private static ValueTask<string> GetConfig(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
+        ct.ThrowIfCancellationRequested();
         try
         {
-            if (_refreshConfig != null)
-                _config = _refreshConfig();
+            configs.Reload();
+            return ValueTask.FromResult("{\"success\":true}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PocketRoulette] Error refreshing config: {ex.Message}");
+            Console.WriteLine($"[PocketRoulette] Config reload failed; keeping previous values: {ex.Message}");
+            return ValueTask.FromResult("{\"success\":false,\"error\":\"invalid_config\"}");
         }
-
-        var config = _config ?? PocketRouletteConfig.CreateDefault();
-        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
-        {
-            WriteIndented = false,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-        return new ValueTask<string>(json);
-    }
-
-    private static ValueTask<string> ReloadConfig(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        try
-        {
-            if (_reloadConfig == null)
-                return new ValueTask<string>("{\"success\":false,\"error\":\"reload_not_ready\"}");
-
-            var config = _reloadConfig();
-            _config = config;
-            Console.WriteLine($"[PocketRoulette] Reloaded config - {config.ItemPool.Count} items in pool, mode: {config.Mode}, itemCount: {config.ItemCount}, clientOverrides: {config.AllowClientOverrides}, debugLogging: {config.DebugLogging}");
-            return new ValueTask<string>("{\"success\":true}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[PocketRoulette] Error reloading config: {ex}");
-            return new ValueTask<string>("{\"success\":false,\"error\":\"exception\"}");
-        }
-    }
-}
+    })
+]);

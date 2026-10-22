@@ -1,227 +1,77 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using System.Threading;
-using System.Threading.Tasks;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
+using SPTarkov.Server.Core.Helpers.Items;
 using SPTarkov.Server.Core.Helpers.Profile;
-using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Common;
-using SPTarkov.Server.Core.Models.Eft.Common.Tables;
+using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Utils;
 using SPTarkov.Server.Core.Utils;
 
 namespace PocketRoulette.Server;
 
-public class InjectItemRequest : IRequestData
+public class RewardRequest : IRequestData
 {
-    [JsonPropertyName("id")]
-    public string Id { get; set; } = string.Empty;
-    
-    [JsonPropertyName("tpl")]
-    public string Tpl { get; set; } = string.Empty;
-    
-    [JsonPropertyName("parentId")]
-    public string ParentId { get; set; } = string.Empty;
-    
-    [JsonPropertyName("slotId")]
-    public string SlotId { get; set; } = string.Empty;
-
-    [JsonPropertyName("stackCount")]
-    public int StackCount { get; set; } = 1;
-    
-    [JsonPropertyName("location")]
-    public InjectItemLocation Location { get; set; } = new();
+    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
+    [JsonPropertyName("tpl")] public string Tpl { get; set; } = string.Empty;
+    [JsonPropertyName("stackCount")] public int StackCount { get; set; } = 1;
+    [JsonPropertyName("profileId")] public string ProfileId { get; set; } = string.Empty;
+    [JsonPropertyName("raidId")] public string RaidId { get; set; } = string.Empty;
+    [JsonPropertyName("planId")] public string PlanId { get; set; } = string.Empty;
 }
-
-public class InjectItemLocation
-{
-    [JsonPropertyName("x")]
-    public int X { get; set; }
-    
-    [JsonPropertyName("y")]
-    public int Y { get; set; }
-    
-    [JsonPropertyName("r")]
-    public int R { get; set; }
-    
-    [JsonPropertyName("isSearched")]
-    public bool IsSearched { get; set; }
-}
-
-public class RegisterGroundItemRequest : IRequestData
-{
-    [JsonPropertyName("id")]
-    public string Id { get; set; } = string.Empty;
-
-    [JsonPropertyName("tpl")]
-    public string Tpl { get; set; } = string.Empty;
-
-    [JsonPropertyName("stackCount")]
-    public int StackCount { get; set; } = 1;
-
-    [JsonPropertyName("position")]
-    public RegisterGroundItemVector Position { get; set; } = new();
-
-    [JsonPropertyName("rotation")]
-    public RegisterGroundItemRotation Rotation { get; set; } = new();
-}
-
-public class RegisterGroundItemVector
-{
-    [JsonPropertyName("x")]
-    public float X { get; set; }
-
-    [JsonPropertyName("y")]
-    public float Y { get; set; }
-
-    [JsonPropertyName("z")]
-    public float Z { get; set; }
-}
-
-public class RegisterGroundItemRotation
-{
-    [JsonPropertyName("x")]
-    public float X { get; set; }
-
-    [JsonPropertyName("y")]
-    public float Y { get; set; }
-
-    [JsonPropertyName("z")]
-    public float Z { get; set; }
-
-    [JsonPropertyName("w")]
-    public float W { get; set; }
-}
-
-public record RegisteredGroundItem(
-    string Id,
-    string Tpl,
-    int StackCount,
-    RegisterGroundItemVector Position,
-    RegisterGroundItemRotation Rotation);
 
 [Injectable]
-public class InjectRouter : StaticRouter
+public class RewardValidator(ProfileHelper profiles, ItemHelper items, ConfigService configs, FeatureService features)
 {
-    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, RegisteredGroundItem>> RegisteredGroundItems = new();
-    private static bool _debugLogging;
-
-    public InjectRouter(JsonUtil jsonUtil, ProfileHelper profileHelper) : base(jsonUtil, GetRoutes(profileHelper))
+    public string Validate(RewardRequest request, MongoId session)
     {
+        if (!ConfigRules.IsItemId(request.Id) || !ConfigRules.IsItemId(request.Tpl))
+            return Failure("invalid_item_id");
+        var pmc = profiles.GetPmcProfile(session);
+        var scav = profiles.GetScavProfile(session);
+        var profile = string.Equals(scav?.Id.ToString(), request.ProfileId, StringComparison.OrdinalIgnoreCase) ? scav
+            : string.Equals(pmc?.Id.ToString(), request.ProfileId, StringComparison.OrdinalIgnoreCase) ? pmc : null;
+        var inventory = profile?.Inventory;
+        if (inventory?.Items == null)
+            return Failure("profile_not_found");
+        if (!features.ValidateGrant(pmc!.Id.ToString() ?? "", request.RaidId, request.PlanId, request.Id, request.Tpl, request.StackCount))
+            return Failure("invalid_reward_grant");
+        if (inventory.Items.Any(item => string.Equals(item.Id.ToString(), request.Id, StringComparison.OrdinalIgnoreCase)))
+            return Failure("duplicate_item_id");
+        var template = items.GetItem(new MongoId(request.Tpl));
+        if (!template.Key || template.Value?.Properties == null)
+            return Failure("unknown_template");
+        if (request.StackCount < 1 || request.StackCount > (template.Value.Properties.StackMaxSize ?? 1))
+            return Failure("invalid_stack_count");
+        var config = configs.Get();
+        if (!config.AllowClientOverrides && !config.ItemPool.Any(item => item.Tpl == request.Tpl))
+            return Failure("template_not_in_pool");
+        // EFT owns the live inventory and the final raid save. Never insert into a
+        // persistent profile here: doing both creates duplicate IDs at raid end.
+        if (config.DebugLogging)
+            Console.WriteLine($"[PocketRoulette] Validated reward {request.Tpl} ({request.Id}) x{request.StackCount}.");
+        return "{\"success\":true}";
     }
 
-    public void SetDebugLogging(bool enabled)
-    {
-        _debugLogging = enabled;
-    }
+    private static string Failure(string error) => $"{{\"success\":false,\"error\":\"{error}\"}}";
+}
 
-    private static List<RouteAction> GetRoutes(ProfileHelper profileHelper)
-    {
-        return
-        [
-            new RouteAction<InjectItemRequest>(
-                "/pocketroulette/inject",
-                (url, request, sessionId, output, cancellationToken) => InjectItem(profileHelper, request, sessionId, cancellationToken)
-            ),
-            new RouteAction<RegisterGroundItemRequest>(
-                "/pocketroulette/register-ground",
-                (url, request, sessionId, output, cancellationToken) => RegisterGroundItem(request, sessionId, cancellationToken)
-            )
-        ];
-    }
-
-    private static ValueTask<string> InjectItem(ProfileHelper profileHelper, InjectItemRequest request, MongoId sessionId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        try
+[Injectable]
+public class InjectRouter(JsonUtil jsonUtil, RewardValidator validator) : StaticRouter(jsonUtil,
+[
+    Route("/pocketroulette/inject", validator),
+    Route("/pocketroulette/register-ground", validator)
+])
+{
+    private static RouteAction Route(string path, RewardValidator validator) => new RouteAction<RewardRequest>(path,
+        (url, request, session, output, ct) =>
         {
-            PmcData? pmcData = profileHelper.GetPmcProfile(sessionId);
-
-            if (pmcData?.Inventory?.Items == null)
+            ct.ThrowIfCancellationRequested();
+            try { return ValueTask.FromResult(validator.Validate(request, session)); }
+            catch (Exception ex)
             {
-                Console.WriteLine($"[PocketRoulette] Failed to sync item: Could not access PMC inventory for profile {sessionId}");
-                return new ValueTask<string>("{\"success\":false,\"error\":\"profile_not_found\"}");
+                Console.WriteLine($"[PocketRoulette] Reward validation failed: {ex.Message}");
+                return ValueTask.FromResult("{\"success\":false,\"error\":\"validation_failed\"}");
             }
-
-            if (string.IsNullOrWhiteSpace(request.Id) || string.IsNullOrWhiteSpace(request.Tpl))
-            {
-                Console.WriteLine("[PocketRoulette] Failed to sync item: missing id or tpl");
-                return new ValueTask<string>("{\"success\":false,\"error\":\"bad_request\"}");
-            }
-
-            if (pmcData.Inventory.Items.Any(item => string.Equals(item.Id.ToString(), request.Id, StringComparison.OrdinalIgnoreCase)))
-            {
-                DebugLog($"Injected item {request.Id} is already in the PMC profile.");
-                return new ValueTask<string>("{\"success\":true}");
-            }
-
-            var item = new Item
-            {
-                Id = new MongoId(request.Id),
-                Template = new MongoId(request.Tpl),
-                ParentId = request.ParentId,
-                SlotId = request.SlotId,
-                Location = new ItemLocation
-                {
-                    X = request.Location.X,
-                    Y = request.Location.Y,
-                    R = (ItemRotation)request.Location.R,
-                    IsSearched = request.Location.IsSearched
-                }
-            };
-
-            if (request.StackCount > 1)
-            {
-                item.Upd = new Upd
-                {
-                    StackObjectsCount = request.StackCount
-                };
-            }
-
-            pmcData.Inventory.Items.Add(item);
-
-            DebugLog($"Synced injected item {request.Tpl} to PMC profile.");
-            return new ValueTask<string>("{\"success\":true}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[PocketRoulette] Error syncing item: {ex}");
-            return new ValueTask<string>("{\"success\":false,\"error\":\"exception\"}");
-        }
-    }
-
-    private static ValueTask<string> RegisterGroundItem(RegisterGroundItemRequest request, MongoId sessionId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        try
-        {
-            if (string.IsNullOrWhiteSpace(request.Id) || string.IsNullOrWhiteSpace(request.Tpl))
-            {
-                Console.WriteLine("[PocketRoulette] Failed to register ground item: missing id or tpl");
-                return new ValueTask<string>("{\"success\":false,\"error\":\"bad_request\"}");
-            }
-
-            var sessionGroundItems = RegisteredGroundItems.GetOrAdd(sessionId.ToString(), _ => new ConcurrentDictionary<string, RegisteredGroundItem>());
-            sessionGroundItems[request.Id] = new RegisteredGroundItem(request.Id, request.Tpl, Math.Max(1, request.StackCount), request.Position, request.Rotation);
-
-            DebugLog($"Registered ground item {request.Tpl} ({request.Id}) x{Math.Max(1, request.StackCount)} for raid pickup tracking.");
-            return new ValueTask<string>("{\"success\":true}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[PocketRoulette] Error registering ground item: {ex}");
-            return new ValueTask<string>("{\"success\":false,\"error\":\"exception\"}");
-        }
-    }
-
-    private static void DebugLog(string message)
-    {
-        if (_debugLogging)
-            Console.WriteLine($"[PocketRoulette] {message}");
-    }
+        });
 }

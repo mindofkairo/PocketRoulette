@@ -4,13 +4,13 @@
         <RootNamespace>PocketRoulette</RootNamespace>
         <AssemblyName>PocketRoulette</AssemblyName>
         <LangVersion>latest</LangVersion>
-        <Version>1.3.0</Version>
+        <Version>1.9.1</Version>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
 
     <PropertyGroup>
-        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -20,6 +20,48 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Reference Include="Unity.TextMeshPro">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Unity.TextMeshPro.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Unity.TextMeshPro.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.UIModule">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.UIModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.UIModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+            <HintPath Condition="'$(GameManagedPath)' != '' And Exists('$(GameManagedPath)/UnityEngine.TextRenderingModule.dll')">$(GameManagedPath)/UnityEngine.TextRenderingModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == '' Or !Exists('$(GameManagedPath)/UnityEngine.TextRenderingModule.dll')">$(RefsPath)/UnityEngine.TextRenderingModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+
+        <Reference Include="UnityEngine.ImageConversionModule">
+            <HintPath Condition="'$(GameManagedPath)' != '' And Exists('$(GameManagedPath)/UnityEngine.ImageConversionModule.dll')">$(GameManagedPath)/UnityEngine.ImageConversionModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == '' Or !Exists('$(GameManagedPath)/UnityEngine.ImageConversionModule.dll')">$(RefsPath)/UnityEngine.ImageConversionModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.IMGUIModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.IMGUIModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.InputLegacyModule.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.InputLegacyModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.UI">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/UnityEngine.UI.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/UnityEngine.UI.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Sirenix.Serialization">
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/Sirenix.Serialization.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/Sirenix.Serialization.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
         <Reference Include="BepInEx">
             <HintPath Condition="'$(GamePath)' != '' And Exists('$(GamePath)/BepInEx/core/BepInEx.dll')">$(GamePath)/BepInEx/core/BepInEx.dll</HintPath>
             <HintPath Condition="('$(GamePath)' == '' Or !Exists('$(GamePath)/BepInEx/core/BepInEx.dll')) And Exists('$(RefsPath)/BepInEx.dll')">$(RefsPath)/BepInEx.dll</HintPath>
@@ -57,7 +99,8 @@
             <Private>false</Private>
         </Reference>
         <Reference Include="DissonanceVoip">
-            <HintPath>$(RefsPath)/DissonanceVoip.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' != ''">$(GameManagedPath)/DissonanceVoip.dll</HintPath>
+            <HintPath Condition="'$(GameManagedPath)' == ''">$(RefsPath)/DissonanceVoip.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="Assembly-CSharp-firstpass">
@@ -114,6 +157,9 @@
 
     <ItemGroup>
         <Compile Remove="FikaBridge.cs" />
+        <Compile Include="../Shared/*.cs" Link="Shared/%(Filename)%(Extension)" />
+        <EmbeddedResource Include="../PocketRoulette.Server/config/config.jsonc" LogicalName="PocketRoulette.DefaultConfig.json" />
+        <Content Include="assets/*.png" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <PropertyGroup>
@@ -121,15 +167,21 @@
         <PluginPath Condition="'$(PluginPath)' == ''">$(GamePath)/BepInEx/plugins/PocketRoulette</PluginPath>
     </PropertyGroup>
 
-    <Target Name="CopyToGame" AfterTargets="AfterBuild" Condition="'$(GamePath)' != '' And Exists('$(GamePath)')">
+    <Target Name="CopyToGame" AfterTargets="AfterBuild" Condition="'$(DeployToGame)' != 'false' And '$(GamePath)' != '' And Exists('$(GamePath)')">
         <Message Importance="high" Text="Copying client plugin to $(PluginPath)" />
         <ItemGroup>
             <PluginFiles Include="$(OutputPath)$(TargetName)$(TargetExt)" />
             <PluginFiles Include="$(OutputPath)$(TargetName).pdb" Condition="Exists('$(OutputPath)$(TargetName).pdb')" />
         </ItemGroup>
         <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginPath)" ContinueOnError="false" />
+        <ItemGroup>
+            <LedgerAssets Include="$(OutputPath)assets/*.png" />
+        </ItemGroup>
+        <Copy SourceFiles="@(LedgerAssets)" DestinationFolder="$(PluginPath)/assets" ContinueOnError="false" />
         <Delete Files="$(PluginPath)/PocketRoulette.Fika.dll" Condition="!Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')" />
         <Delete Files="$(PluginPath)/PocketRoulette.Fika.pdb" Condition="!Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')" />
         <Message Text="Client plugin copied successfully." Importance="high" />
     </Target>
 </Project>
+
+

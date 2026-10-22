@@ -13,12 +13,14 @@ namespace PocketRoulette
 
             if (string.IsNullOrWhiteSpace(json))
             {
-                Plugin.LogSource.LogWarning("[PocketRoulette] Empty response from server config route.");
-                return Models.PocketRouletteConfig.CreateDefault();
+                throw new System.InvalidOperationException("Empty response from the Pocket Roulette server config route.");
             }
 
             var config = JsonConvert.DeserializeObject<Models.PocketRouletteConfig>(json);
-            return config ?? Models.PocketRouletteConfig.CreateDefault();
+            if (config == null)
+                throw new System.InvalidOperationException("The Pocket Roulette server returned a null config.");
+            ConfigRules.Normalize(config);
+            return config;
         }
     }
 }

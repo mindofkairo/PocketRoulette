@@ -6,13 +6,16 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <OutputType>Library</OutputType>
-        <Version>1.3.0</Version>
-        <SptVersion>^4.1.0</SptVersion>
+        <Version>1.9.1</Version>
+        <SptVersion>&gt;=4.1.0 &lt;4.2.0</SptVersion>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <DefineConstants>$(DefineConstants);SERVER_JSON</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="../Shared/*.cs" Link="Shared/%(Filename)%(Extension)" />
+        <EmbeddedResource Include="config/config.jsonc" LogicalName="PocketRoulette.DefaultConfig.json" />
         <PackageReference Include="SPTarkov.Common" Version="4.1.0" />
         <PackageReference Include="SPTarkov.DI" Version="4.1.0" />
         <PackageReference Include="SPTarkov.Server.Core" Version="4.1.0" />
@@ -36,3 +39,5 @@
         <Message Text="Server mod files copied successfully." Importance="high" />
     </Target>
 </Project>
+
+

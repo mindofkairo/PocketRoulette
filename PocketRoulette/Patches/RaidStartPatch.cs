@@ -45,6 +45,10 @@ namespace PocketRoulette.Patches
                     return;
                 }
 
+                if (gameWorld.GetComponent<PocketRouletteScript>() != null)
+                    return;
+
+                RaidLifetime.For(gameWorld);
                 gameWorld.gameObject.AddComponent<PocketRouletteScript>();
 
                 Plugin.LogSource.LogInfo("[PocketRoulette] Raid started - Pocket Roulette is rolling the dice!");

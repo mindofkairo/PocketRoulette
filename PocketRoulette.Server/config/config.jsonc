@@ -1,12 +1,180 @@
 {
-  "mode": "mixed",
+  // SERVER FEATURE SWITCHES: apply to every player when their raid starts. Dependencies are listed below.
+  // Master switch for the luck system for ALL players. Each player still has their own saved luck.
+  // OFF pauses luck effects, gains/decay, empty-pocket bonuses and lucky challenges; saved luck is kept.
+  // Shared jackpots, purchases and enabled grenade events still work at base odds without luck.
+  "enableLuck": true,
+  // Requires enableLuck. Grow stored luck after an unlucky starting batch, with configurable decay below.
+  "enableBadLuckProtection": true,
+  // Requires enableLuck. Temporary luck for starting a raid with every pocket grid empty.
+  "enableEmptyPocketBonus": true,
+  // Winner chooses: keep both prizes, or keep the main prize and give teammates gifts.
+  "enableSharedJackpots": true,
+  // Requires enableLuck. Chance to assign a survival, travel or kill challenge for bonus spins.
+  "enableLuckyChallenges": true,
+  // Permit optional paid spins. Players choose a count in F12; default count is ZERO.
+  "enableBuyInSpins": true,
+  // Master permission for ALL grenade outcomes. OFF removes the grenade wheel AND cursed jackpots from random rolls.
+  "enableGrenadeEvent": false,
+  // Requires enableGrenadeEvent. Valuable timed ground loot followed by an explosion; missed loot disappears.
+  "enableCursedJackpot": true,
+  // Requires enableGrenadeEvent. OFF uses the single grenadeTpl instead of the wheel; it does not disable grenades.
+  "enableGrenadeWheel": true,
+
+  // Luck uses points, not percentages. Zero is normal odds.
+  "luck": {
+    // Maximum effective luck, including stored and temporary bonuses.
+    "maxLuck": 20,
+    // Each point adds this fraction of the normal rare tier weight.
+    "rareWeightPerPoint": 0.10,
+    // Each point adds this fraction of the normal ultrarare tier weight.
+    "ultraRareWeightPerPoint": 0.20,
+    // Luck also raises cursed/shared event weights. Zero leaves their weights unchanged.
+    "positiveEventWeightPerPoint": 0.10,
+    // Higher luck biases cursed countdowns toward the configured maximum, never beyond it. Set 0 for a uniform delay.
+    "cursedDelayBiasPerPoint": 0.10,
+    // Grenade weight is divided by (1 + luck * this value).
+    "grenadeReductionPerPoint": 0.10,
+    // Challenge assignment chance is multiplied by (1 + luck * this value), capped at 100%.
+    "challengeChancePerPoint": 0.05,
+    // Show the effective luck used for every roll.
+    "showAtRoll": true
+  },
+  "badLuckProtection": {
+    // Gained once per completed unlucky starting batch, never once per purchased spin.
+    "gainPerUnluckyRaid": 1,
+    // Cap on persistent luck from bad-luck protection.
+    "maxStoredLuck": 10,
+    // A successfully received rare/ultrarare reward removes this percentage, once per raid.
+    "winDecayPercent": 50,
+    // Lose this many stored points per inactive real-world day. Set 0 to disable.
+    "inactivityDecayPerDay": 0.25,
+    // Notify when stored luck increases or decays.
+    "notifyChanges": true
+  },
+  "emptyPocketBonus": {
+    // Temporary points for this raid only; snapshot is taken before roulette gives any items.
+    "luckPoints": 2
+  },
+  "cursedJackpot": {
+    // Relative event weight alongside the available rarity tiers; 0 removes this event.
+    "weight": 1,
+    // Random delay AFTER the explanation and successful prize placement, in seconds.
+    "minExplosionDelaySeconds": 6,
+    // Maximum delay before both explosion and expiry of still-unclaimed loot.
+    "maxExplosionDelaySeconds": 10,
+    // Time to read what a cursed jackpot means BEFORE its deadline starts.
+    "explanationSeconds": 2,
+    // Lowest eligible rarity for its valuable prize.
+    "minimumRarity": "rare",
+    // Use a timed fragmentation grenade here; smoke/impact types cannot promise a timed explosion.
+    "grenadeTpl": "5448be9a4bdc2dfd2f8b456a"
+  },
+  "sharedJackpots": {
+    // Relative shared-jackpot event weight; 0 removes the event.
+    "weight": 1,
+    // Winner chooses with configurable F12 keys. Timeout keeps both prizes.
+    "decisionSeconds": 20,
+    // Main prize the winner keeps either way. Empty matching pools disable this event.
+    "winnerMinimumRarity": "ultrarare",
+    // Additional prize only kept when the winner declines to share, or plays solo.
+    "bonusMinimumRarity": "rare",
+    // Each eligible teammate gets a separate gift rolled with THEIR own luck.
+    "giftMinimumRarity": "rare",
+    // Tell the party who won and whether they shared or kept the jackpot.
+    "notifyGroup": true,
+    // One line is chosen per decision and shared with the group. {user} or (user) becomes the winner's nickname.
+    // Empty arrays use a plain fallback. These messages are server-owned; changes apply to new raids.
+    "shareMessages": [
+      "{user} shared their jackpot! Drinks are on them.",
+      "{user} cracked the jackpot open for the squad. Everybody eats!",
+      "{user} chose the team over the extra loot. Enjoy your gifts!",
+      "{user} shared the wealth. That's one way to buy loyalty.",
+      "{user} passed out jackpot gifts. Try not to lose them before extract."
+    ],
+    // The (user) placeholder is also supported so this inside-joke line can stay exactly as written.
+    "keepMessages": [
+      "{user} kept their jackpot. Apparently sharing wasn't in the budget.",
+      "{user} kept their jackpot! Two prizes, zero generosity.",
+      "{user} kept their jackpot. The squad gets moral support instead.",
+      "{user} kept their jackpot! Friendship doesn't pay for hideout upgrades.",
+      "(user) is being a stingy bitch and kept their jackpot!"
+    ]
+  },
+  "luckyChallenges": {
+    // Base assignment chance per eligible raid; personal luck can raise it.
+    "assignmentChancePercent": 30,
+    // Enable the survival-time challenge type.
+    "survivalEnabled": true,
+    // Active, living raid time required; pausing does not advance it.
+    "survivalSeconds": 300,
+    // Enable the walking/running-distance challenge type.
+    "walkingEnabled": true,
+    // Ordinary travel distance required. Teleports and spectator movement do not count.
+    "walkingMeters": 750,
+    // Reward-only bonus spins; they cannot recursively trigger events or new challenges.
+    "bonusSpins": 1,
+    // Show survival/travel milestones or matching kill counts, plus assignment/completion notices.
+    "notifyProgress": true,
+    // Each enabled preset is one possible challenge, alongside enabled survival and travel challenges.
+    // kills: 1-100. targetType: any, scav, or pmc (human/AI USEC/BEAR).
+    // AI pmcUSEC/pmcBEAR roles count as PMCs even with Savage-side profiles. Raiders/Rogues remain Scavs.
+    // Distance is measured at death. Zero means no bound; positive bounds are STRICT (> min, < max).
+    // Teammate/self kills and duplicate death reports do not count. An empty list disables kill challenges.
+    "killPresets": [
+      { "id": "any-kills", "name": "On a roll", "enabled": true, "kills": 3, "targetType": "any", "minDistanceMeters": 0, "maxDistanceMeters": 0 },
+      { "id": "scav-kills", "name": "Scav hunter", "enabled": true, "kills": 3, "targetType": "scav", "minDistanceMeters": 0, "maxDistanceMeters": 0 },
+      { "id": "pmc-kills", "name": "PMC hunter", "enabled": true, "kills": 1, "targetType": "pmc", "minDistanceMeters": 0, "maxDistanceMeters": 0 },
+      { "id": "close-kill", "name": "Up close", "enabled": true, "kills": 1, "targetType": "any", "minDistanceMeters": 0, "maxDistanceMeters": 25 },
+      { "id": "distant-kill", "name": "Long shot", "enabled": true, "kills": 1, "targetType": "any", "minDistanceMeters": 75, "maxDistanceMeters": 0 }
+    ]
+  },
+  "buyInSpins": {
+    // Stash roubles per extra spin. Purchases occur at raid start, PMC only.
+    "priceRoubles": 25000,
+    // Maximum chosen per raid. F12 selection recurs until the player sets it back to 0.
+    "maxSpinsPerRaid": 2
+  },
+  // Templates sourced from https://api.tarkov.dev/api/v1/item?q=grenade&lang=en.
+  // dangerous=true choices become less likely with luck; other choices become more likely.
+  // tpl=existing throwable ID, name=warning label, weight=relative choice weight within this wheel.
+  // prewarmSeconds is fuse ALREADY spent, not the desired remaining fuse.
+  "grenadeWheel": [
+    { "tpl": "5448be9a4bdc2dfd2f8b456a", "name": "RGD-5", "weight": 45, "dangerous": true, "prewarmSeconds": 1.5 },
+    { "tpl": "58d3db5386f77426186285a0", "name": "M67", "weight": 15, "dangerous": true, "prewarmSeconds": 0 },
+    { "tpl": "5a0c27731526d80618476ac4", "name": "Zarya flashbang", "weight": 20, "dangerous": false, "prewarmSeconds": 0 },
+    { "tpl": "617aa4dd8166f034d57de9c5", "name": "M18 green smoke", "weight": 20, "dangerous": false, "prewarmSeconds": 0 }
+  ],
+"mode": "mixed",
+  // Starting spins per raid (1-20); purchased/challenge spins are separate.
   "itemCount": 1,
+  // Chance that the starting wheel runs (0-100). A value of 0 disables all roulette, including purchases.
   "chancePercent": 100,
+  // Show roulette messages, including warnings, luck, challenges and sharing decisions.
   "enableNotification": true,
+  // Detailed troubleshooting logs.
   "debugLogging": false,
+  // Trust clients to override legacy item/message/roll settings. Feature switches and luck stay server-owned.
   "allowClientOverrides": false,
-  "allowGroundDrop": false,
+  // Normal prizes that do not fit pockets can fall at your feet. Cursed prizes always start on the ground.
+  "allowGroundDrop": true,
+  // Allow player scav raids. Buy-ins remain PMC only.
   "scavEnabled": true,
+  // Relative live-grenade event weight, before personal luck adjustment.
+  "grenadeWeight": 5,
+  // Warning delay before an ordinary grenade appears at its fixed location.
+  "grenadeSpawnDelaySeconds": 0.75,
+  // Fallback existing grenade template when the wheel is disabled/empty.
+  "grenadeTpl": "5448be9a4bdc2dfd2f8b456a",
+  // Fuse already spent on the fallback grenade. Remaining fuse depends on the template.
+  "grenadeTimeSpentSeconds": 1.5,
+  // Ordinary grenade warnings. Tokens: {delay}, {grenade}.
+  "grenadeMessages": [
+    "A live grenade is about to land where you are standing. RUN!",
+    "Pocket Roulette picked a grenade. Move away from this spot!",
+    "That's not loot! A live grenade will appear here in {delay}s!"
+  ],
+  // Pocket reward messages. Token: {item}.
   "pocketMessages": [
     "The Pocket Gods smile upon you: {item}",
     "You found a {item} in your pocket. How'd that get there?",
@@ -17,27 +185,32 @@
     "Ah yes, the classic pocket {item}.",
     "A {item} materializes in your pocket. Don't question it."
   ],
+  // Ground reward messages. Tokens: {item}, {location}.
   "groundDropMessages": [
     "Pockets full! A {item} tumbles to the ground at your feet.",
     "No room in your pockets - a {item} clatters to the floor.",
     "A {item} falls out of... somewhere. Your pockets are full though.",
     "Overflow! A {item} drops at your feet."
   ],
+  // Full-pocket missed reward messages. Token: {item}.
   "missedRewardMessages": [
     "Your pockets were full. You missed out on {item}.",
     "No pocket space. {item} vanished before you could grab it.",
     "Pocket Roulette rolled {item}, but your pockets were full."
   ],
+  // Messages when the starting chance check misses.
   "chanceMissMessages": [
     "Pocket Roulette spun the wheel, but luck was not on your side.",
     "The pocket gods looked away this raid.",
     "Nothing appeared in your pockets this time."
   ],
+  // Ultrarare reward messages. Tokens: {item}, {odds}, {comparison}.
   "ultraRareMessages": [
     "JACKPOT! A {item} appears! (Odds: ~{odds} - rarer than {comparison})",
     "You lucky rat! A {item}! (Odds: ~{odds} - {comparison})",
     "NO WAY. A {item}! (Odds: ~{odds} - that's rarer than {comparison})"
   ],
+  // Optional comparison phrases for ultrarare messages.
   "ultraRareOddsComparisons": [
     "finding a GPU on the floor of Interchange",
     "a Scav being friendly",
@@ -45,12 +218,15 @@
     "a raider dropping a keycard",
     "a peaceful day in Tarkov"
   ],
+  // Failed reward messages. Token: {item}.
   "failureMessages": [
     "Pocket Roulette failed to spawn {item}."
   ],
+  // Batch summaries. Tokens include {total}, {pocketCount}, {groundPart}, {missedPart}, {failedPart}, {grenadePart}, {bestPart}.
   "multiRollSummaryMessages": [
-    "Pocket Roulette rolled {total} rewards: {pocketCount} in pockets{groundPart}{missedPart}{failedPart}.{bestPart}"
+    "Pocket Roulette rolled {total} rewards: {pocketCount} in pockets{groundPart}{missedPart}{failedPart}{grenadePart}.{bestPart}"
   ],
+  // Existing EFT rewards only. tpl=template ID, name=display text, weight=relative within rarity, rarity=common/uncommon/rare/ultrarare. width/height are descriptive; EFT determines real size. minCount/maxCount are stack bounds, clamped to the real template maximum.
   "itemPool": [
     {
       "tpl": "5448ff904bdc2d6f028b456e",
@@ -944,3 +1120,4 @@
     }
   ]
 }
+

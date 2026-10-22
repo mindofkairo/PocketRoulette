@@ -5,7 +5,7 @@ using PocketRoulette.Patches;
 
 namespace PocketRoulette
 {
-    [BepInPlugin("com.kairo.pocketroulette", "PocketRoulette", "1.3.0")]
+    [BepInPlugin("com.kairo.pocketroulette", "PocketRoulette", "1.9.1")]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource LogSource = null!;
@@ -15,26 +15,21 @@ namespace PocketRoulette
         {
             LogSource = Logger;
             ClientConfigManager.Bind(Config, Path.GetDirectoryName(Info.Location));
+            PlayerMenu.Bind(Config);
+            new MenuInputPatch().Enable();
+#if POCKET_ROULETTE_TESTING
+            TestingPanel.Bind(Config);
+#endif
             Config.Save();
-            CachedConfig = LoadStartupConfig();
-            ClientConfigManager.EnsureJsonExists(CachedConfig);
+            CachedConfig = Models.PocketRouletteConfig.CreateDefault();
 
             new RaidStartPatch().Enable();
             FikaMaybe.Init();
 
-            LogSource.LogInfo("pocket roulette loaded");
-        }
-
-        private Models.PocketRouletteConfig LoadStartupConfig()
-        {
-            try
-            {
-                return ConfigLoader.FetchConfig();
-            }
-            catch
-            {
-                return Models.PocketRouletteConfig.CreateDefault();
-            }
+            // Fetch the authoritative config at raid start. Resolve() also creates
+            // optional local content from that response, once the server is ready.
+            LogSource.LogInfo("Pocket Roulette loaded; server configuration will be fetched at raid start.");
         }
     }
 }
+

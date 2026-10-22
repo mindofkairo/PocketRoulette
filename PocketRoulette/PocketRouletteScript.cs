@@ -2,1003 +2,393 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Comfort.Common;
+using System.Threading;
+using System.Threading.Tasks;
 using EFT;
-using EFT.Communications;
 using EFT.InventoryLogic;
-using EFT.InventoryLogic.Operations;
-using Newtonsoft.Json;
 using PocketRoulette.Models;
-using SPT.Common.Http;
 using UnityEngine;
 
 namespace PocketRoulette
 {
-    public class PocketRouletteScript : MonoBehaviour
+    public sealed partial class PocketRouletteScript : MonoBehaviour
     {
-        private const float InventoryReadyDelaySeconds = 3f;
-        private const string InjectRoute = "/pocketroulette/inject";
-        private const string RegisterGroundRoute = "/pocketroulette/register-ground";
-        private const int MinItemCount = 1;
-        private const int MaxItemCount = 20;
-        private const float SptAddTimeoutSeconds = 5f;
-        private readonly System.Random _localRandom = CreateLocalRandom();
-        private bool _destroyAfterRoll = true;
-        private bool _waitingForSptAdd;
-        private RewardResult _waitingForSptResult;
+        private readonly RewardInventory _inventory = new RewardInventory();
+        private readonly Queue<RollPlan> _queue = new Queue<RollPlan>();
+        private readonly HashSet<string> _seenPlans = new HashSet<string>();
+        private readonly HashSet<string> _seenNotices = new HashSet<string>();
+        private readonly Dictionary<string, string> _unconfirmed = new Dictionary<string, string>();
+        private readonly string _raidKey = Guid.NewGuid().ToString("N");
+        private GameWorld _world;
+        private Player _player;
+        private CancellationToken _token;
+        private PocketRouletteConfig _config;
+        private string _raidId;
+        private bool _processing;
+        private bool _refreshing;
+        private bool _halted;
+        private bool _ready;
+        private bool _deathReported;
+        private readonly RaidSyncSchedule _sync = new RaidSyncSchedule();
+        private string _reportedChallenge;
+        private double _survived;
+        private double _walked;
+        private Vector3 _lastPosition;
+        private LuckyChallenge _challenge;
+        private int _challengeQuarter;
+        private string _offerId;
+        private TaskCompletionSource<bool> _choice;
+        private bool _emptyAtStart;
 
         private void Awake()
         {
-            StartCoroutine(RollPocketRoulette());
+            Player.OnPlayerDeadStatic += TrackChallengeKill;
+            var player = GetComponent<GameWorld>()?.MainPlayer;
+            var pockets = player?.Profile.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets)?.ContainedItem as CompoundItem;
+            _emptyAtStart = pockets != null && !pockets.GetAllItems().Any(item => item.Id != pockets.Id);
+            gameObject.AddComponent<PlayerMenu>();
+#if POCKET_ROULETTE_TESTING
+            gameObject.AddComponent<TestingPanel>();
+#endif
         }
 
-        private IEnumerator RollPocketRoulette()
+        private IEnumerator Start()
         {
-            yield return new WaitForSeconds(InventoryReadyDelaySeconds);
+            yield return new WaitForSeconds(3);
+            _ = Begin();
+        }
 
-            var config = GetConfig();
-            if (config?.ItemPool == null || config.ItemPool.Count == 0)
+        private async Task Begin()
+        {
+            try
             {
-                Plugin.LogSource.LogWarning("[PocketRoulette] No config or empty item pool. Skipping.");
-                Destroy(this);
-                yield break;
+                _world = GetComponent<GameWorld>();
+                _player = _world?.MainPlayer;
+                if (_player == null) return;
+                _token = RaidLifetime.For(_world).Token;
+                RaidLifetime.RequirePlayer(_world, _player, _token);
+                FikaMaybe.RequireBridge();
+                var local = ClientConfigManager.Resolve(ConfigLoader.FetchConfig());
+                var party = FikaMaybe.Party(_player);
+                var begin = new RaidBeginRequest
+                {
+                    RaidKey = _raidKey, ProfileId = _player.ProfileId, GroupId = party.GroupId, PartyIds = party.MemberIds,
+                    EmptyPockets = _emptyAtStart, BuyInCount = ClientConfigManager.BuyInCount, ClientConfig = local
+                };
+                RaidUpdate update = null;
+                for (var attempt = 0; attempt < 3; attempt++)
+                {
+                    try { update = RaidApi.Begin(begin); break; }
+                    catch when (attempt < 2) { await Task.Delay(1000, _token); }
+                }
+                _raidId = update.RaidId;
+                _config = update.Config;
+                Plugin.CachedConfig = _config;
+                _lastPosition = _player.Transform.position;
+                if (update.ChanceMissed) RewardNotifications.ChanceMiss(_config);
+                Apply(update);
+                if (_config.EnableLuck && _config.EnableEmptyPocketBonus && update.EmptyPocketLuck > 0)
+                    RewardNotifications.Notice(_config, $"Empty-pocket bonus: +{update.EmptyPocketLuck:0.##} luck for this raid.");
+                // Warm every possible grenade on every peer, not just the selected outcome's owner.
+                if (_config.EnableGrenadeEvent)
+                {
+                    var templates = (_config.EnableGrenadeWheel ? _config.GrenadeWheel.Select(entry => entry.Tpl) : new[] { _config.GrenadeTpl })
+                        .Concat(_config.EnableCursedJackpot ? new[] { _config.CursedJackpot.GrenadeTpl } : Array.Empty<string>()).Distinct();
+                    foreach (var tpl in templates)
+                    {
+                        try { await LiveGrenadeSpawner.Prepare(tpl, _token); }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception ex) { Plugin.LogSource.LogWarning($"[PocketRoulette] Grenade warmup failed for {tpl}: {ex.Message}"); }
+                    }
+                }
+                _ready = true;
+                StartQueue();
             }
-
-            var gameWorld = Singleton<GameWorld>.Instance;
-            if (gameWorld == null)
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
             {
-                Plugin.LogSource.LogError("[PocketRoulette] GameWorld is null in coroutine.");
-                Destroy(this);
-                yield break;
+                _halted = true;
+#if POCKET_ROULETTE_TESTING
+                TestMessage = "Raid initialization failed: " + ex.Message;
+#endif
+                Plugin.LogSource.LogError($"[PocketRoulette] Raid initialization failed: {ex}");
+                if (_config != null) RewardNotifications.Notice(_config, "Pocket Roulette could not initialize. Check the client/server logs.");
             }
+        }
 
-            var player = gameWorld.MainPlayer;
-            if (player == null)
+        private void Update()
+        {
+            UpdateJackpotNotifications();
+            if (string.IsNullOrEmpty(_raidId) || _token.IsCancellationRequested || _player == null) return;
+            var alive = _player.gameObject.activeInHierarchy && _player.HealthController.IsAlive;
+            if (alive)
             {
-                Plugin.LogSource.LogError("[PocketRoulette] MainPlayer is null in coroutine.");
-                Destroy(this);
-                yield break;
+                _survived += Time.deltaTime;
+                var position = _player.Transform.position;
+                var delta = position - _lastPosition;
+                delta.y = 0;
+                if (Time.deltaTime > 0 && delta.magnitude <= Time.deltaTime * 12 + 0.25f) _walked += delta.magnitude;
+                _lastPosition = position;
+                if (_choice != null)
+                {
+                    if (ClientConfigManager.SharePressed) _choice.TrySetResult(true);
+                    else if (ClientConfigManager.KeepPressed) _choice.TrySetResult(false);
+                }
+                ChallengeProgress();
             }
-
-            if (!config.ScavEnabled && IsPlayerScav(player))
+            else _choice?.TrySetResult(false);
+            if (alive && _challenge != null && ChallengeRules.Enabled(_config) && !_challenge.Completed && _reportedChallenge != _challenge.Id
+                && CurrentChallengeProgress() >= _challenge.Target)
             {
-                Plugin.LogSource.LogDebug("[PocketRoulette] Player scav raid detected and scavEnabled is false. Skipping.");
-                Destroy(this);
-                yield break;
+                _reportedChallenge = _challenge.Id;
+                RequestStateRefresh();
             }
-
-            var eligibleItems = FilterByMode(config.ItemPool, config.Mode);
-            if (eligibleItems.Count == 0)
+            if (!_refreshing && _sync.TryStart(Time.unscaledTime, _unconfirmed.Count > 0, !alive && !_deathReported))
             {
-                Plugin.LogSource.LogWarning($"[PocketRoulette] No eligible items for mode '{config.Mode}'. Skipping.");
-                Destroy(this);
-                yield break;
+                if (!alive) _deathReported = true;
+                _ = RefreshState(alive);
             }
+        }
 
-            var itemCount = GetItemCount(config);
+        public void RequestStateRefresh()
+        {
+            _sync.Request(Time.unscaledTime);
+        }
+
+        private async Task RefreshState(bool alive)
+        {
+            _refreshing = true;
+            try
+            {
+                foreach (var ack in _unconfirmed.ToList())
+                {
+                    Apply(RaidApi.Action("complete", new RaidActionRequest { RaidId = _raidId, PlanId = ack.Key, Placement = ack.Value }));
+                    _unconfirmed.Remove(ack.Key);
+                }
+                Apply(RaidApi.Action("update", new RaidActionRequest { RaidId = _raidId, Alive = alive,
+                    SurvivedSeconds = _survived, WalkedMeters = _walked, PartyIds = FikaMaybe.Party(_player).MemberIds,
+                    ChallengeId = _challenge?.Id ?? "", ChallengeKills = _challenge?.Kills?.ToList() ?? new List<ChallengeKillReport>() }));
+                if (alive) StartQueue();
+                _sync.Succeeded();
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                _sync.Failed(Time.unscaledTime);
+                Plugin.LogSource.LogWarning($"[PocketRoulette] Raid update failed; pending grants will not be spawned again: {ex.Message}");
+            }
+            finally { _refreshing = false; }
+        }
+
+        private void Apply(RaidUpdate update)
+        {
+#if POCKET_ROULETTE_TESTING
+            if (update.Testing != null)
+            {
+                _testingUpdate = update;
+                if (update.Challenge == null) _challenge = null;
+            }
+#endif
+            if (update.Config != null) _config = update.Config;
+            foreach (var notice in update.Notices)
+                if (_seenNotices.Add(notice.Id)) RewardNotifications.Notice(_config, notice.Text);
+            foreach (var plan in update.Rolls)
+            {
+                if (plan.Id == _offerId && plan.DecisionMade.HasValue) _choice?.TrySetResult(plan.DecisionMade.Value);
+                if (_seenPlans.Add(plan.Id)) _queue.Enqueue(plan);
+            }
+            if (update.Challenge != null && ChallengeRules.Enabled(_config))
+            {
+                if (_challenge == null || _challenge.Id != update.Challenge.Id)
+                {
+                    _challengeQuarter = 0;
+                    _reportedChallenge = null;
+                    RewardNotifications.ChallengeAssigned(_config, update.Challenge);
+                }
+                else if (update.Challenge.Kind == "kills")
+                {
+                    // Keep not-yet-reported local kills when another action refreshes server state.
+                    foreach (var kill in _challenge.Kills)
+                        if (!update.Challenge.Kills.Any(existing => existing.VictimId == kill.VictimId)) update.Challenge.Kills.Add(kill);
+                }
+                _challenge = update.Challenge;
+            }
+            else _challenge = null;
+        }
+
+        private void StartQueue()
+        {
+            if (_ready && !_processing && !_halted && _unconfirmed.Count == 0 && _queue.Count > 0) _ = ProcessQueue();
+        }
+
+        private async Task ProcessQueue()
+        {
+            _processing = true;
+            var summarize = _queue.Count > 1;
             var results = new List<RewardResult>();
-            var showIndividualNotifications = itemCount == 1;
-            var chancePercent = GetChancePercent(config);
-
-            if (chancePercent <= 0 || _localRandom.Next(100) >= chancePercent)
-            {
-                Plugin.LogSource.LogInfo($"[PocketRoulette] Chance roll missed ({chancePercent}%). No reward this raid.");
-                ShowChanceMissNotification(config);
-                Destroy(this);
-                yield break;
-            }
-
-            for (var rollNumber = 1; rollNumber <= itemCount; rollNumber++)
-            {
-                try
-                {
-                    var selectedItem = PickRewardItem(eligibleItems, config.Mode);
-
-                    Plugin.LogSource.LogInfo($"[PocketRoulette] Roll {rollNumber}/{itemCount}: {selectedItem.Name} (TPL: {selectedItem.Tpl}, Rarity: {selectedItem.Rarity}, Size: {selectedItem.Width}x{selectedItem.Height})");
-
-                    results.Add(TrySpawnReward(player, config, selectedItem, eligibleItems, showIndividualNotifications));
-                }
-                catch (Exception ex)
-                {
-                    Plugin.LogSource.LogError($"[PocketRoulette] Error during roll {rollNumber}/{itemCount}: {ex}");
-                }
-
-                var waitStarted = Time.time;
-                while (_waitingForSptAdd && Time.time - waitStarted < SptAddTimeoutSeconds)
-                    yield return null;
-
-                if (_waitingForSptAdd)
-                {
-                    Plugin.LogSource.LogError("[PocketRoulette] SPT add callback timed out. Moving on so the raid start script can finish.");
-                    _waitingForSptResult?.MarkFailed();
-                    _waitingForSptResult = null;
-                    _waitingForSptAdd = false;
-                }
-
-                yield return null;
-            }
-
-            if (!showIndividualNotifications)
-            {
-                _destroyAfterRoll = false;
-                StartCoroutine(ShowMultiRollNotificationThenDestroy(config, results));
-            }
-
-            if (_destroyAfterRoll)
-                Destroy(this);
-        }
-
-        private List<PoolItem> FilterByMode(List<PoolItem> pool, string mode)
-        {
-            switch (mode?.ToLower())
-            {
-                case "garbage":
-                    return pool.Where(i => i.Rarity == "common" || i.Rarity == "uncommon").ToList();
-                case "useful":
-                    return pool.Where(i => i.Rarity == "common" || i.Rarity == "uncommon" || i.Rarity == "rare" || i.Rarity == "ultrarare").ToList();
-                case "jackpot":
-                    return pool.Where(i => i.Rarity == "uncommon" || i.Rarity == "rare" || i.Rarity == "ultrarare").ToList();
-                case "chaos":
-                case "mixed":
-                default:
-                    return pool;
-            }
-        }
-
-        private PocketRouletteConfig GetConfig()
-        {
+            var luckUsed = new List<double>();
             try
             {
-                var serverConfig = ConfigLoader.FetchConfig();
-                Plugin.CachedConfig = ClientConfigManager.Resolve(serverConfig);
-            }
-            catch (Exception ex)
-            {
-                Plugin.LogSource.LogWarning($"config broke, using defaults: {ex.Message}");
-                Plugin.CachedConfig = PocketRouletteConfig.CreateDefault();
-            }
-
-            return Plugin.CachedConfig;
-        }
-
-        private int GetItemCount(PocketRouletteConfig config)
-        {
-            if (config.ItemCount < MinItemCount)
-                return MinItemCount;
-
-            if (config.ItemCount > MaxItemCount)
-            {
-                Plugin.LogSource.LogWarning($"[PocketRoulette] itemCount {config.ItemCount} is too high. Clamping to {MaxItemCount}.");
-                return MaxItemCount;
-            }
-
-            return config.ItemCount;
-        }
-
-        private int GetChancePercent(PocketRouletteConfig config)
-        {
-            if (config.ChancePercent < 0)
-                return 0;
-
-            if (config.ChancePercent > 100)
-                return 100;
-
-            return config.ChancePercent;
-        }
-
-        private bool IsPlayerScav(Player player)
-        {
-            try
-            {
-                var side = player.Profile?.Info?.Side.ToString();
-                return !string.IsNullOrEmpty(side)
-                    && side.IndexOf("savage", StringComparison.OrdinalIgnoreCase) >= 0;
-            }
-            catch (Exception ex)
-            {
-                Plugin.LogSource.LogWarning($"[PocketRoulette] Could not determine player side: {ex.Message}");
-                return false;
-            }
-        }
-
-        private PoolItem PickRewardItem(List<PoolItem> items, string mode)
-        {
-            var rarity = PickWeightedRarity(items, mode);
-            var rarityItems = items.Where(item => string.Equals(item.Rarity, rarity, StringComparison.OrdinalIgnoreCase)).ToList();
-
-            return rarityItems.Count > 0
-                ? PickWeightedItem(rarityItems)
-                : PickWeightedItem(items);
-        }
-
-        private string PickWeightedRarity(List<PoolItem> items, string mode)
-        {
-            var rarityWeights = GetAvailableRarityWeights(items, mode);
-
-            if (rarityWeights.Count == 0)
-                return items[0].Rarity;
-
-            var totalWeight = rarityWeights.Sum(entry => entry.Value);
-            var roll = _localRandom.Next(totalWeight);
-            var cumulativeWeight = 0;
-
-            foreach (var entry in rarityWeights)
-            {
-                cumulativeWeight += entry.Value;
-                if (roll < cumulativeWeight)
-                    return entry.Key;
-            }
-
-            return rarityWeights[rarityWeights.Count - 1].Key;
-        }
-
-        private List<KeyValuePair<string, int>> GetAvailableRarityWeights(List<PoolItem> items, string mode)
-        {
-            return GetRarityWeights(mode)
-                .Where(entry => entry.Value > 0 && items.Any(item => string.Equals(item.Rarity, entry.Key, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-        }
-
-        private Dictionary<string, int> GetRarityWeights(string mode)
-        {
-            switch (mode?.ToLower())
-            {
-                case "garbage":
-                    return new Dictionary<string, int>
+                while (_queue.Count > 0 && !_halted && _unconfirmed.Count == 0)
+                {
+                    RaidLifetime.RequirePlayer(_world, _player, _token);
+                    var plan = _queue.Dequeue();
+                    var placement = "failed";
+                    RewardResult summaryResult = null;
+                    try
                     {
-                        { "common", 95 },
-                        { "uncommon", 5 },
-                        { "rare", 0 },
-                        { "ultrarare", 0 }
-                    };
-                case "useful":
-                    return new Dictionary<string, int>
-                    {
-                        { "common", 15 },
-                        { "uncommon", 60 },
-                        { "rare", 23 },
-                        { "ultrarare", 2 }
-                    };
-                case "jackpot":
-                    return new Dictionary<string, int>
-                    {
-                        { "common", 0 },
-                        { "uncommon", 15 },
-                        { "rare", 70 },
-                        { "ultrarare", 15 }
-                    };
-                case "chaos":
-                    return new Dictionary<string, int>
-                    {
-                        { "common", 25 },
-                        { "uncommon", 25 },
-                        { "rare", 25 },
-                        { "ultrarare", 25 }
-                    };
-                case "mixed":
-                default:
-                    return new Dictionary<string, int>
-                    {
-                        { "common", 65 },
-                        { "uncommon", 25 },
-                        { "rare", 8 },
-                        { "ultrarare", 2 }
-                    };
-            }
-        }
-
-        private PoolItem PickWeightedItem(List<PoolItem> items)
-        {
-            var totalWeight = items.Sum(i => i.Weight);
-            var roll = _localRandom.Next(totalWeight);
-
-            var cumulativeWeight = 0;
-            foreach (var poolItem in items)
-            {
-                cumulativeWeight += poolItem.Weight;
-                if (roll < cumulativeWeight)
-                    return poolItem;
-            }
-
-            return items[items.Count - 1];
-        }
-
-        private Item CreateItem(string templateId)
-        {
-            try
-            {
-                var itemFactory = Singleton<ItemFactory>.Instance;
-                if (itemFactory != null)
-                {
-                    return itemFactory.CreateItem(MongoID.Generate(), templateId, null);
-                }
-
-                Plugin.LogSource.LogError("[PocketRoulette] ItemFactory singleton not available.");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                Plugin.LogSource.LogError($"[PocketRoulette] Failed to create item '{templateId}': {ex.Message}");
-                return null;
-            }
-        }
-
-        private RewardResult TrySpawnReward(Player player, PocketRouletteConfig config, PoolItem poolItem, List<PoolItem> eligibleItems, bool showIndividualNotification)
-        {
-            try
-            {
-                var rouletteItem = CreateItem(poolItem.Tpl);
-                if (rouletteItem == null)
-                {
-                    Plugin.LogSource.LogError($"[PocketRoulette] Failed to create item for pockets: {poolItem.Tpl}");
-                    if (showIndividualNotification)
-                        ShowFailureNotification(config, poolItem);
-
-                    return RewardResult.Failed(poolItem, 1);
-                }
-
-                var stackCount = RollStackCount(poolItem, rouletteItem);
-                ApplyStackCount(rouletteItem, stackCount);
-
-                var inventoryController = player.InventoryController;
-                if (inventoryController == null)
-                {
-                    Plugin.LogSource.LogError("[PocketRoulette] Player InventoryController is null.");
-                    if (showIndividualNotification)
-                        ShowFailureNotification(config, poolItem);
-
-                    return RewardResult.Failed(poolItem, stackCount);
-                }
-
-                var pocketsSlot = player.Profile.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets);
-                if (!(pocketsSlot?.ContainedItem is CompoundItem pocketsItem))
-                {
-                    Plugin.LogSource.LogWarning("[PocketRoulette] Player has no pockets equipped.");
-                    return HandleNoPocketSpace(player, rouletteItem, config, poolItem, stackCount, showIndividualNotification);
-                }
-
-                var pocketAddress = FindPocketAddress(rouletteItem, pocketsItem);
-                if (pocketAddress == null)
-                {
-                    Plugin.LogSource.LogInfo($"[PocketRoulette] No pocket space found for {poolItem.Name}.");
-                    return HandleNoPocketSpace(player, rouletteItem, config, poolItem, stackCount, showIndividualNotification);
-                }
-
-                var addResult = ItemManipulator.Add(rouletteItem, pocketAddress, inventoryController, true);
-                if (addResult.Failed)
-                {
-                    Plugin.LogSource.LogWarning($"[PocketRoulette] EFT rejected pocket add for {poolItem.Name}: {addResult.Error}.");
-                    return HandleNoPocketSpace(player, rouletteItem, config, poolItem, stackCount, showIndividualNotification);
-                }
-
-                if (!SyncPocketItemToServer(rouletteItem, pocketAddress))
-                {
-                    Plugin.LogSource.LogError($"[PocketRoulette] Server sync failed for {poolItem.Name}; not adding locally.");
-                    if (showIndividualNotification)
-                        ShowFailureNotification(config, poolItem);
-
-                    return RewardResult.Failed(poolItem, stackCount);
-                }
-
-                if (FikaMaybe.Installed())
-                {
-                    if (!AddWithFika(player, inventoryController, rouletteItem, pocketAddress, config, poolItem, eligibleItems, showIndividualNotification))
-                        return RewardResult.Failed(poolItem, stackCount);
-                }
-                else
-                {
-                    var result = RewardResult.Pocket(poolItem, stackCount);
-                    AddWithSpt(player, inventoryController, rouletteItem, pocketAddress, config, poolItem, eligibleItems, showIndividualNotification, result);
-                    return result;
-                }
-
-                return RewardResult.Pocket(poolItem, stackCount);
-            }
-            catch (Exception ex)
-            {
-                Plugin.LogSource.LogError($"[PocketRoulette] Error spawning reward: {ex}");
-                if (showIndividualNotification)
-                    ShowFailureNotification(config, poolItem);
-
-                return RewardResult.Failed(poolItem, 1);
-            }
-        }
-
-        private RewardResult HandleNoPocketSpace(Player player, Item rouletteItem, PocketRouletteConfig config, PoolItem poolItem, int stackCount, bool showIndividualNotification)
-        {
-            if (config.AllowGroundDrop)
-            {
-                return TryDropAtFeet(player, rouletteItem, config, poolItem, showIndividualNotification)
-                    ? RewardResult.Ground(poolItem, stackCount)
-                    : RewardResult.Failed(poolItem, stackCount);
-            }
-
-            Plugin.LogSource.LogInfo($"[PocketRoulette] Ground fallback disabled. {poolItem.Name} was skipped.");
-            if (showIndividualNotification)
-                ShowMissedRewardNotification(config, poolItem, stackCount);
-
-            return RewardResult.Missed(poolItem, stackCount);
-        }
-
-        private bool AddWithFika(Player player, InventoryController inventoryController, Item rouletteItem, ItemAddress pocketAddress, PocketRouletteConfig config, PoolItem poolItem, List<PoolItem> eligibleItems, bool showIndividualNotification)
-        {
-            if (!FikaMaybe.SendPocket(player, rouletteItem, pocketAddress))
-            {
-                Plugin.LogSource.LogError($"[PocketRoulette] Fika sync failed for {poolItem.Name}; not adding locally.");
-                if (showIndividualNotification)
-                    ShowFailureNotification(config, poolItem);
-                return false;
-            }
-
-            inventoryController.AddAndRaiseEvents(rouletteItem, pocketAddress);
-            Plugin.LogSource.LogInfo($"[PocketRoulette] Added {poolItem.Name} to pockets after server sync.");
-            if (showIndividualNotification)
-            {
-                _destroyAfterRoll = false;
-                StartCoroutine(ShowPocketNotificationThenDestroy(config, poolItem, eligibleItems, rouletteItem.StackObjectsCount));
-            }
-
-            return true;
-        }
-
-        private void AddWithSpt(Player player, InventoryController inventoryController, Item rouletteItem, ItemAddress pocketAddress, PocketRouletteConfig config, PoolItem poolItem, List<PoolItem> eligibleItems, bool showIndividualNotification, RewardResult rewardResult)
-        {
-            _waitingForSptAdd = true;
-            _waitingForSptResult = rewardResult;
-
-            var operation = new ChangeItemsOperation(
-                inventoryController.GetAndIncrementNextOperationId(),
-                Array.Empty<Item>(),
-                new Dictionary<Item, ItemAddress> { { rouletteItem, pocketAddress } },
-                new Dictionary<Item, ItemAddress>(),
-                new Dictionary<IItemInfoContainer, ItemInfo>(),
-                null,
-                player);
-
-            try
-            {
-                inventoryController.Execute(operation, operationResult =>
-                {
-                    if (!operationResult.Succeed)
-                    {
-                        Plugin.LogSource.LogError($"[PocketRoulette] SPT add failed for {poolItem.Name}: {operationResult.Error}");
-                        if (showIndividualNotification)
-                            ShowFailureNotification(config, poolItem);
-                        rewardResult.MarkFailed();
-                        _waitingForSptResult = null;
-                        _waitingForSptAdd = false;
-                        return;
+                        if (plan.Kind == "shared") { await ChooseJackpot(plan); continue; }
+                        if (plan.Kind == "grenade" || plan.Kind == "cursed")
+                        {
+                            MenuInteraction.CloseActive();
+                            // Revalidate against server feature switches before starting any hazard.
+                            var authorized = RaidApi.Event(_raidId, plan.Id);
+                            var cooperative = FikaMaybe.Installed();
+                            // In Fika the host waits once, after warning the whole party.
+                            var prepared = await LiveEventRunner.PrepareAndExplain(_world, _player, plan, authorized.Config, _token,
+                                waitBeforeSpawn: !cooperative);
+                            if (cooperative)
+                            {
+                                var eventTask = FikaMaybe.SendEvent(_player, _raidId, plan, prepared.Position);
+                                var claimed = false;
+                                while (!eventTask.IsCompleted)
+                                {
+                                    claimed |= plan.Kind == "cursed" && LiveEventRunner.HasPrize(_player, plan.ItemId);
+                                    await Task.Delay(25, _token);
+                                }
+                                placement = !await eventTask ? "failed" : plan.Kind == "grenade" ? "grenade"
+                                    : claimed || LiveEventRunner.HasPrize(_player, plan.ItemId) ? "picked" : "expired";
+                            }
+                            else placement = await LiveEventRunner.Solo(_world, _player, plan, authorized.Config, prepared, _token);
+                            if (placement == "expired") RewardNotifications.Notice(_config, "Cursed jackpot missed: its unclaimed prize has vanished.");
+                            else if (placement == "failed") RewardNotifications.Notice(_config, "The live event failed. Check the logs.");
+                            summaryResult = new RewardResult(plan.Reward, plan.StackCount, placement == "grenade" ? RewardPlacement.Grenade
+                                : placement == "picked" ? RewardPlacement.Ground : placement == "expired" ? RewardPlacement.Missed : RewardPlacement.Failed);
+                        }
+                        else
+                        {
+                            var result = await _inventory.Place(_player, _config, plan, _raidId, _token);
+                            placement = result.Placement.ToString().ToLowerInvariant();
+                            summaryResult = result;
+                            if (!summarize) RewardNotifications.Single(_config, result, plan);
+                        }
                     }
-
-                    Plugin.LogSource.LogInfo($"[PocketRoulette] Added {poolItem.Name} to pockets.");
-                    if (showIndividualNotification)
-                        ShowPocketNotification(config, poolItem, eligibleItems, rouletteItem.StackObjectsCount);
-
-                    _waitingForSptResult = null;
-                    _waitingForSptAdd = false;
-                });
-            }
-            catch
-            {
-                _waitingForSptResult = null;
-                _waitingForSptAdd = false;
-                throw;
-            }
-        }
-
-        private bool TryDropAtFeet(Player player, Item rouletteItem, PocketRouletteConfig config, PoolItem poolItem, bool showIndividualNotification)
-        {
-            try
-            {
-                var gameWorld = Singleton<GameWorld>.Instance;
-                var playerTransform = player.Transform;
-                var dropPosition = playerTransform.position + (playerTransform.forward * 0.75f) + new Vector3(0f, 0.35f, 0f);
-                var dropRotation = Quaternion.identity;
-
-                if (!SyncGroundItemToServer(rouletteItem, dropPosition, dropRotation))
-                {
-                    Plugin.LogSource.LogError($"[PocketRoulette] Server ground registration failed for {poolItem.Name}; not dropping locally.");
-                    if (showIndividualNotification)
-                        ShowFailureNotification(config, poolItem);
-
-                    return false;
-                }
-
-                gameWorld.ThrowItem(rouletteItem, player, dropPosition, dropRotation, Vector3.zero, Vector3.zero, true, false, 0f);
-                if (!FikaMaybe.SendGround(player, rouletteItem, dropPosition, dropRotation))
-                {
-                    Plugin.LogSource.LogWarning($"[PocketRoulette] Dropped {poolItem.Name} locally, but Fika ground sync failed.");
-                }
-
-                Plugin.LogSource.LogInfo($"[PocketRoulette] Dropped {poolItem.Name} at player's feet.");
-                if (showIndividualNotification)
-                    ShowGroundDropNotification(config, poolItem, rouletteItem.StackObjectsCount);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Plugin.LogSource.LogError($"[PocketRoulette] Failed to drop {poolItem.Name} at player's feet: {ex}");
-                if (showIndividualNotification)
-                    ShowFailureNotification(config, poolItem);
-
-                return false;
-            }
-        }
-
-        private int RollStackCount(PoolItem poolItem, Item item)
-        {
-            var minCount = Math.Max(1, poolItem.MinCount);
-            var maxCount = Math.Max(minCount, poolItem.MaxCount);
-            var templateMax = Math.Max(1, item.StackMaxSize);
-            var clampedMax = Math.Min(maxCount, templateMax);
-
-            if (clampedMax <= minCount)
-                return Math.Min(minCount, clampedMax);
-
-            return _localRandom.Next(minCount, clampedMax + 1);
-        }
-
-        private void ApplyStackCount(Item item, int stackCount)
-        {
-            item.StackObjectsCount = Math.Max(1, stackCount);
-            item.UpdateAttributes();
-        }
-
-        private bool SyncGroundItemToServer(Item rouletteItem, Vector3 position, Quaternion rotation)
-        {
-            try
-            {
-                var requestBody = new
-                {
-                    id = rouletteItem.Id,
-                    tpl = rouletteItem.TemplateId,
-                    stackCount = rouletteItem.StackObjectsCount,
-                    position = new
+                    catch (OperationCanceledException) { throw; }
+                    catch (TimeoutException ex)
                     {
-                        x = position.x,
-                        y = position.y,
-                        z = position.z
-                    },
-                    rotation = new
-                    {
-                        x = rotation.x,
-                        y = rotation.y,
-                        z = rotation.z,
-                        w = rotation.w
+                        _halted = true;
+#if POCKET_ROULETTE_TESTING
+                        TestMessage = "Placement timed out. Test reset cannot safely retry an uncertain native transaction. See the logs.";
+#endif
+                        Plugin.LogSource.LogError($"[PocketRoulette] Placement timed out; later rolls stopped: {ex}");
+                        RewardNotifications.Notice(_config, "Pocket Roulette stopped because a placement timed out. Pending items will not be retried.");
                     }
-                };
-
-                var response = RequestHandler.PostJson(RegisterGroundRoute, JsonConvert.SerializeObject(requestBody));
-                if (!string.IsNullOrWhiteSpace(response) && response.IndexOf("\"success\":false", StringComparison.OrdinalIgnoreCase) >= 0)
-                    return false;
-
-                Plugin.LogSource.LogInfo($"[PocketRoulette] Server registered ground item {rouletteItem.TemplateId} ({rouletteItem.Id}).");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Plugin.LogSource.LogError($"[PocketRoulette] Error registering ground item with server: {ex}");
-                return false;
-            }
-        }
-
-        private ItemAddress FindPocketAddress(Item rouletteItem, CompoundItem pocketsItem)
-        {
-            foreach (var grid in pocketsItem.Grids)
-            {
-                var address = grid.FindLocationForItem(rouletteItem);
-                if (address != null)
-                    return address;
-            }
-
-            return null;
-        }
-
-        private bool SyncPocketItemToServer(Item rouletteItem, ItemAddress pocketAddress)
-        {
-            try
-            {
-                if (!(pocketAddress is GridItemAddress gridAddress))
-                {
-                    Plugin.LogSource.LogError($"[PocketRoulette] Unexpected pocket address type: {pocketAddress.GetType().FullName}");
-                    return false;
-                }
-
-                var grid = gridAddress.Grid;
-                var location = gridAddress.LocationInGrid;
-                var requestBody = new
-                {
-                    id = rouletteItem.Id,
-                    tpl = rouletteItem.TemplateId,
-                    stackCount = rouletteItem.StackObjectsCount,
-                    parentId = grid.ParentItem.Id,
-                    slotId = grid.ID,
-                    location = new
+                    catch (Exception ex)
                     {
-                        x = location.x,
-                        y = location.y,
-                        r = (int)location.r,
-                        isSearched = true
+                        Plugin.LogSource.LogError($"[PocketRoulette] Grant {plan.Id} failed: {ex}");
+                        if (plan.Kind == "shared")
+                        {
+                            // Opening/deciding is idempotent; retry the offer after the next successful poll.
+                            _seenPlans.Remove(plan.Id);
+                            _sync.Request(Time.unscaledTime, 3);
+                            break;
+                        }
+                        RewardNotifications.Single(_config, new RewardResult(plan.Reward, plan.StackCount, RewardPlacement.Failed), plan);
                     }
-                };
-
-                var response = RequestHandler.PostJson(InjectRoute, JsonConvert.SerializeObject(requestBody));
-                if (!string.IsNullOrWhiteSpace(response) && response.IndexOf("\"success\":false", StringComparison.OrdinalIgnoreCase) >= 0)
-                    return false;
-
-                Plugin.LogSource.LogInfo($"[PocketRoulette] Server synced {rouletteItem.TemplateId} at {grid.ID} ({location.x},{location.y},{location.r}).");
-                return true;
+                    if (summarize)
+                    {
+                        results.Add(summaryResult ?? new RewardResult(plan.Reward, plan.StackCount, RewardPlacement.Failed));
+                        luckUsed.Add(plan.Luck);
+                    }
+                    _unconfirmed[plan.Id] = placement;
+                    try
+                    {
+                        Apply(RaidApi.Action("complete", new RaidActionRequest { RaidId = _raidId, PlanId = plan.Id, Placement = placement }));
+                        _unconfirmed.Remove(plan.Id);
+                    }
+                    catch (Exception ex) { Plugin.LogSource.LogWarning($"[PocketRoulette] Delivery confirmation pending: {ex.Message}"); }
+                }
             }
-            catch (Exception ex)
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Plugin.LogSource.LogError($"[PocketRoulette] Roll queue stopped: {ex}"); }
+            finally
             {
-                Plugin.LogSource.LogError($"[PocketRoulette] Error syncing item with server: {ex}");
-                return false;
+                if (summarize && results.Count > 0 && !_token.IsCancellationRequested)
+                {
+                    var luck = _config.EnableLuck && _config.Luck.ShowAtRoll ? " Luck used: "
+                        + string.Join(", ", luckUsed.GroupBy(value => value).Select(group => $"{group.Key:0.##} ({group.Count()} spin(s))")) + "." : "";
+                    RewardNotifications.Summary(_config, results, luck);
+                }
+                _processing = false;
             }
         }
 
-        private void ShowPocketNotification(PocketRouletteConfig config, PoolItem selectedItem, List<PoolItem> eligibleItems, int stackCount)
+        private async Task ChooseJackpot(RollPlan plan)
         {
-            if (!config.EnableNotification) return;
-
+            var requestTime = System.Diagnostics.Stopwatch.StartNew();
+            var update = RaidApi.Action("offer", new RaidActionRequest { RaidId = _raidId, PlanId = plan.Id,
+                PartyIds = FikaMaybe.Party(_player).MemberIds });
+            Apply(update);
+            FikaMaybe.NotifyStateChanged();
+            plan = update.Rolls.FirstOrDefault(entry => entry.Id == plan.Id) ?? plan;
+            if (plan.DecisionMade.HasValue || plan.TeammateCount == 0) return;
+            _offerId = plan.Id;
+            _choice = new TaskCompletionSource<bool>();
             try
             {
-                string message;
-                Color color;
-
-                if (selectedItem.Rarity == "ultrarare" && config.UltraRareMessages.Count > 0)
-                {
-                    var oddsPercent = GetItemOddsPercent(selectedItem, eligibleItems, config.Mode);
-                    var oddsText = oddsPercent < 1f ? $"{oddsPercent:F2}%" : $"{oddsPercent:F1}%";
-                    var comparison = config.UltraRareOddsComparisons.Count > 0
-                        ? PickRandom(config.UltraRareOddsComparisons)
-                        : "finding a GPU on the floor of Interchange";
-
-                    message = PickRandom(config.UltraRareMessages);
-                    message = message.Replace("{item}", FormatRewardName(selectedItem, stackCount))
-                                    .Replace("{odds}", oddsText)
-                                    .Replace("{comparison}", comparison);
-                    color = new Color(1f, 0.84f, 0f);
-                }
-                else if (config.PocketMessages.Count > 0)
-                {
-                    message = PickRandom(config.PocketMessages);
-                    message = message.Replace("{item}", FormatRewardName(selectedItem, stackCount));
-                    color = GetRarityColor(selectedItem.Rarity);
-                }
-                else
-                {
-                    return;
-                }
-
-                NotificationManager.DisplayMessageNotification(
-                    message,
-                    ENotificationDurationType.Long,
-                    ENotificationIconType.Default,
-                    color
-                );
+                var remaining = Math.Max(0, plan.DecisionSeconds - requestTime.Elapsed.TotalSeconds);
+                StartJackpotNotifications(plan, remaining);
+                var timeout = Task.Delay(TimeSpan.FromSeconds(remaining), _token);
+                var chosen = await Task.WhenAny(_choice.Task, timeout);
+                _token.ThrowIfCancellationRequested();
+                var share = chosen == _choice.Task && await _choice.Task;
+                StopJackpotNotifications();
+                Apply(RaidApi.Action("decide", new RaidActionRequest { RaidId = _raidId, PlanId = plan.Id, Share = share,
+                    PartyIds = FikaMaybe.Party(_player).MemberIds }));
+                FikaMaybe.NotifyStateChanged();
             }
-            catch (Exception ex)
+            finally { StopJackpotNotifications(); _choice = null; _offerId = null; }
+        }
+
+        private void ChallengeProgress()
+        {
+            if (_challenge == null || _challenge.Completed || !ChallengeRules.Enabled(_config)) return;
+            var progress = CurrentChallengeProgress();
+            if (_challenge.Kind == "kills")
             {
-                Plugin.LogSource.LogWarning($"[PocketRoulette] Failed to show notification: {ex.Message}");
-            }
-        }
-
-        private IEnumerator ShowPocketNotificationThenDestroy(PocketRouletteConfig config, PoolItem selectedItem, List<PoolItem> eligibleItems, int stackCount)
-        {
-            yield return new WaitForSeconds(0.5f);
-            ShowPocketNotification(config, selectedItem, eligibleItems, stackCount);
-            Destroy(this);
-        }
-
-        private IEnumerator ShowMultiRollNotificationThenDestroy(PocketRouletteConfig config, List<RewardResult> results)
-        {
-            yield return new WaitForSeconds(0.5f);
-            ShowMultiRollNotification(config, results);
-            Destroy(this);
-        }
-
-        private void ShowMultiRollNotification(PocketRouletteConfig config, List<RewardResult> results)
-        {
-            if (!config.EnableNotification || results.Count == 0)
+                var kills = (int)progress;
+                if (kills > _challengeQuarter && kills < _challenge.Target && _config.LuckyChallenges.NotifyProgress)
+                    RewardNotifications.Notice(_config, $"Lucky challenge: {_challenge.Name} - {kills}/{_challenge.Target:0} kills.");
+                _challengeQuarter = kills;
                 return;
-
-            try
-            {
-                var pocketItems = results.Where(result => result.Placement == RewardPlacement.Pocket).ToList();
-                var groundItems = results.Where(result => result.Placement == RewardPlacement.Ground).ToList();
-                var missedItems = results.Where(result => result.Placement == RewardPlacement.Missed).ToList();
-                var failedItems = results.Where(result => result.Placement == RewardPlacement.Failed).ToList();
-
-                var highlights = PickHighlights(results);
-                var template = config.MultiRollSummaryMessages.Count > 0
-                    ? PickRandom(config.MultiRollSummaryMessages)
-                    : "Pocket Roulette rolled {total} rewards: {pocketCount} in pockets{groundPart}{missedPart}{failedPart}.{bestPart}";
-
-                var message = template
-                    .Replace("{total}", results.Count.ToString())
-                    .Replace("{pocketCount}", pocketItems.Count.ToString())
-                    .Replace("{groundCount}", groundItems.Count.ToString())
-                    .Replace("{missedCount}", missedItems.Count.ToString())
-                    .Replace("{failedCount}", failedItems.Count.ToString())
-                    .Replace("{groundPart}", groundItems.Count > 0 ? $", {groundItems.Count} at your feet" : "")
-                    .Replace("{missedPart}", missedItems.Count > 0 ? $", {missedItems.Count} missed" : "")
-                    .Replace("{failedPart}", failedItems.Count > 0 ? $", {failedItems.Count} failed" : "")
-                    .Replace("{bestFinds}", highlights.Count > 0 ? string.Join(", ", highlights) : "")
-                    .Replace("{bestPart}", highlights.Count > 0 ? $" Best finds: {string.Join(", ", highlights)}." : "");
-
-                NotificationManager.DisplayMessageNotification(
-                    message,
-                    ENotificationDurationType.Long,
-                    ENotificationIconType.Default,
-                    GetBestRarityColor(results)
-                );
             }
-            catch (Exception ex)
+            var quarter = Math.Min(3, (int)(progress / _challenge.Target * 4));
+            if (quarter > _challengeQuarter)
             {
-                Plugin.LogSource.LogWarning($"[PocketRoulette] Failed to show multi-roll notification: {ex.Message}");
+                _challengeQuarter = quarter;
+                if (_config.LuckyChallenges.NotifyProgress) RewardNotifications.Notice(_config, $"Lucky challenge: {quarter * 25}% complete.");
             }
         }
 
-        private List<string> PickHighlights(List<RewardResult> results)
+        private void OnDestroy()
         {
-            return results
-                .Where(IsReceivedReward)
-                .OrderByDescending(result => RarityRank(result.Item.Rarity))
-                .ThenBy(result => result.Item.Name)
-                .Take(3)
-                .Select(FormatRewardName)
-                .ToList();
-        }
-
-        private Color GetBestRarityColor(List<RewardResult> results)
-        {
-            var best = results
-                .Where(IsReceivedReward)
-                .OrderByDescending(result => RarityRank(result.Item.Rarity))
-                .FirstOrDefault();
-
-            return best != null ? GetRarityColor(best.Item.Rarity) : Color.red;
-        }
-
-        private bool IsReceivedReward(RewardResult result)
-        {
-            return result.Placement == RewardPlacement.Pocket || result.Placement == RewardPlacement.Ground;
-        }
-
-        private void ShowGroundDropNotification(PocketRouletteConfig config, PoolItem poolItem, int stackCount)
-        {
-            if (!config.EnableNotification) return;
-
-            var message = config.GroundDropMessages.Count > 0
-                ? PickRandom(config.GroundDropMessages)
-                : "Your pockets are full. A {item} appears at your feet.";
-            var text = message.Replace("{item}", FormatRewardName(poolItem, stackCount)).Replace("{location}", "at your feet");
-
-            if (!MessageMentionsItem(text, poolItem))
-                text = $"{text} ({FormatRewardName(poolItem, stackCount)})";
-
-            if (text.IndexOf("feet", StringComparison.OrdinalIgnoreCase) < 0 && text.IndexOf("ground", StringComparison.OrdinalIgnoreCase) < 0)
-                text = $"{text} It landed at your feet.";
-
-            NotificationManager.DisplayMessageNotification(
-                text,
-                ENotificationDurationType.Long,
-                ENotificationIconType.Default,
-                GetRarityColor(poolItem.Rarity)
-            );
-        }
-
-        private void ShowMissedRewardNotification(PocketRouletteConfig config, PoolItem poolItem, int stackCount)
-        {
-            if (!config.EnableNotification) return;
-
-            var message = config.MissedRewardMessages.Count > 0
-                ? PickRandom(config.MissedRewardMessages)
-                : "Your pockets were full. You missed out on {item}.";
-            var text = message.Replace("{item}", FormatRewardName(poolItem, stackCount));
-
-            if (!MessageMentionsItem(text, poolItem))
-                text = $"{text} ({FormatRewardName(poolItem, stackCount)})";
-
-            NotificationManager.DisplayMessageNotification(
-                text,
-                ENotificationDurationType.Long,
-                ENotificationIconType.Default,
-                Color.red
-            );
-        }
-
-        private void ShowChanceMissNotification(PocketRouletteConfig config)
-        {
-            if (!config.EnableNotification || config.ChancePercent >= 100)
-                return;
-
-            var message = config.ChanceMissMessages.Count > 0
-                ? PickRandom(config.ChanceMissMessages)
-                : "Pocket Roulette spun the wheel, but luck was not on your side.";
-
-            NotificationManager.DisplayMessageNotification(
-                message,
-                ENotificationDurationType.Long,
-                ENotificationIconType.Default,
-                Color.gray
-            );
-        }
-
-        private void ShowFailureNotification(PocketRouletteConfig config, PoolItem poolItem)
-        {
-            if (!config.EnableNotification) return;
-
-            var message = config.FailureMessages.Count > 0
-                ? PickRandom(config.FailureMessages)
-                : "Pocket Roulette failed to spawn {item}.";
-
-            NotificationManager.DisplayMessageNotification(
-                message.Replace("{item}", FormatRewardName(poolItem, 1)),
-                ENotificationDurationType.Long,
-                ENotificationIconType.Default,
-                Color.red
-            );
-        }
-
-        private string FormatRewardName(PoolItem poolItem, int stackCount)
-        {
-            var name = stackCount > 1
-                ? StripSingleCountPrefix(poolItem.Name)
-                : poolItem.Name;
-
-            return stackCount > 1
-                ? $"{name} x{stackCount}"
-                : name;
-        }
-
-        private string FormatRewardName(RewardResult result)
-        {
-            var name = result.StackCount > 1
-                ? StripSingleCountPrefix(result.Item.Name)
-                : result.Item.Name;
-
-            return result.StackCount > 1
-                ? $"{name} x{result.StackCount}"
-                : name;
-        }
-
-        private string StripSingleCountPrefix(string name)
-        {
-            if (name.StartsWith("1x ", StringComparison.OrdinalIgnoreCase))
-                return name.Substring(3);
-
-            if (name.StartsWith("1 ", StringComparison.OrdinalIgnoreCase))
-                return name.Substring(2);
-
-            return name;
-        }
-
-        private bool MessageMentionsItem(string text, PoolItem poolItem)
-        {
-            var itemName = poolItem.Name;
-            var displayName = StripSingleCountPrefix(poolItem.Name);
-
-            return text.IndexOf(itemName, StringComparison.OrdinalIgnoreCase) >= 0
-                || text.IndexOf(displayName, StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private float GetItemOddsPercent(PoolItem selectedItem, List<PoolItem> eligibleItems, string mode)
-        {
-            var rarityWeights = GetAvailableRarityWeights(eligibleItems, mode);
-            var totalRarityWeight = rarityWeights.Sum(entry => entry.Value);
-            if (totalRarityWeight <= 0)
-                return 0f;
-
-            var selectedRarityWeight = rarityWeights
-                .Where(entry => string.Equals(entry.Key, selectedItem.Rarity, StringComparison.OrdinalIgnoreCase))
-                .Select(entry => entry.Value)
-                .FirstOrDefault();
-            if (selectedRarityWeight <= 0)
-                return 0f;
-
-            var sameRarityItems = eligibleItems
-                .Where(item => string.Equals(item.Rarity, selectedItem.Rarity, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            var totalItemWeight = sameRarityItems.Sum(item => Math.Max(0, item.Weight));
-            if (totalItemWeight <= 0)
-                return 0f;
-
-            var rarityChance = (float)selectedRarityWeight / totalRarityWeight;
-            var itemChance = (float)Math.Max(0, selectedItem.Weight) / totalItemWeight;
-            return rarityChance * itemChance * 100f;
-        }
-
-        private Color GetRarityColor(string rarity)
-        {
-            switch (rarity)
+            Player.OnPlayerDeadStatic -= TrackChallengeKill;
+            StopJackpotNotifications();
+#if POCKET_ROULETTE_TESTING
+            if (_testingOriginal != null)
             {
-                case "common":
-                    return new Color(0.7f, 0.7f, 0.7f);
-                case "uncommon":
-                    return new Color(0.3f, 0.85f, 0.3f);
-                case "rare":
-                    return new Color(0.4f, 0.6f, 1f);
-                case "ultrarare":
-                    return new Color(1f, 0.84f, 0f);
-                default:
-                    return Color.white;
+                var normalId = _testingOriginal.RaidId;
+                _ = Task.Run(() => { try { RaidApi.Action("end", new RaidActionRequest { RaidId = normalId }); } catch { } });
             }
-        }
-
-        private int RarityRank(string rarity)
-        {
-            switch (rarity)
+#endif
+            var id = _raidId;
+            if (string.IsNullOrEmpty(id)) return;
+            // Only the HTTP request leaves the Unity thread; no Unity objects are used here.
+            _ = Task.Run(() =>
             {
-                case "ultrarare":
-                    return 4;
-                case "rare":
-                    return 3;
-                case "uncommon":
-                    return 2;
-                case "common":
-                    return 1;
-                default:
-                    return 0;
-            }
-        }
-
-        private T PickRandom<T>(IReadOnlyList<T> values)
-        {
-            return values[_localRandom.Next(values.Count)];
-        }
-
-        private static System.Random CreateLocalRandom()
-        {
-            return new System.Random(BitConverter.ToInt32(Guid.NewGuid().ToByteArray(), 0));
-        }
-
-        private enum RewardPlacement
-        {
-            Pocket,
-            Ground,
-            Missed,
-            Failed
-        }
-
-        private class RewardResult
-        {
-            public PoolItem Item { get; private set; }
-            public RewardPlacement Placement { get; private set; }
-            public int StackCount { get; private set; }
-
-            private RewardResult(PoolItem item, RewardPlacement placement, int stackCount)
-            {
-                Item = item;
-                Placement = placement;
-                StackCount = Math.Max(1, stackCount);
-            }
-
-            public static RewardResult Pocket(PoolItem item, int stackCount)
-            {
-                return new RewardResult(item, RewardPlacement.Pocket, stackCount);
-            }
-
-            public static RewardResult Ground(PoolItem item, int stackCount)
-            {
-                return new RewardResult(item, RewardPlacement.Ground, stackCount);
-            }
-
-            public static RewardResult Failed(PoolItem item, int stackCount)
-            {
-                return new RewardResult(item, RewardPlacement.Failed, stackCount);
-            }
-
-            public static RewardResult Missed(PoolItem item, int stackCount)
-            {
-                return new RewardResult(item, RewardPlacement.Missed, stackCount);
-            }
-
-            public void MarkFailed()
-            {
-                Placement = RewardPlacement.Failed;
-            }
+                try { RaidApi.Action("end", new RaidActionRequest { RaidId = id }); }
+                catch { }
+            });
         }
     }
 }
