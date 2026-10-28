@@ -44,7 +44,7 @@ namespace PocketRoulette
                 _window.height = Math.Min(830, Screen.height - 30);
                 _window.x = Mathf.Clamp(_window.x, 0, Math.Max(0, Screen.width - _window.width));
                 _window.y = Mathf.Clamp(_window.y, 0, Math.Max(0, Screen.height - _window.height));
-                _window = GUI.Window(WindowId, _window, Draw, $"Pocket Roulette 1.9.1 | TEST MENU | {_key.Value.ToString().ToUpperInvariant()} / Esc to close");
+                _window = GUI.Window(WindowId, _window, Draw, $"Pocket Roulette 1.9.2 | TEST MENU | {_key.Value.ToString().ToUpperInvariant()} / Esc to close");
                 GUI.BringWindowToFront(WindowId);
                 if (!_renderLogged && Event.current.type == EventType.Repaint)
                 {

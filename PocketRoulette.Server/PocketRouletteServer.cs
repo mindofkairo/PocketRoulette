@@ -12,7 +12,7 @@ public record ModMetadata : IModMetadata
     public string ModGuid { get; init; } = "com.kairo.pocketroulette.server";
     public string Name { get; init; } = "Pocket Roulette (Server)";
     public string Author { get; init; } = "kairo";
-    public SemanticVersioning.Version Version { get; init; } = new("1.9.1");
+    public SemanticVersioning.Version Version { get; init; } = new("1.9.2");
     public Range SptVersion { get; init; } = new(">=4.1.0 <4.2.0");
     public string License { get; init; } = "MIT";
     public bool HasPrepatcher { get; init; } = false;
@@ -33,7 +33,7 @@ public class PocketRouletteServer(ModHelper modHelper, ConfigService configServi
         try { features.Initialize(folder); }
         catch (Exception ex) { Console.WriteLine($"[PocketRoulette] Feature state could not load; roulette requests will be refused: {ex.Message}"); }
         var config = configService.Get();
-        Console.WriteLine($"[PocketRoulette] 1.9.1 / SPT 4.1.X: {config.ItemPool.Count} rewards, mode {config.Mode}, {config.ItemCount} roll(s), grenade event {(config.EnableGrenadeEvent ? "enabled" : "disabled")}.");
+        Console.WriteLine($"[PocketRoulette] 1.9.2 / SPT 4.1.X: {config.ItemPool.Count} rewards, mode {config.Mode}, {config.ItemCount} roll(s), grenade event {(config.EnableGrenadeEvent ? "enabled" : "disabled")}.");
         return Task.CompletedTask;
     }
 }

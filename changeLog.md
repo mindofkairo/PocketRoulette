@@ -1,6 +1,6 @@
 # Pocket Roulette Changelog
 
-## v1.9.1 - SPT 4.1.X update
+## v1.9.2 - SPT 4.1.X update
 
 Changes since the SPT 4.0.X release (v1.2.1).
 
@@ -18,6 +18,7 @@ Changes since the SPT 4.0.X release (v1.2.1).
 
 ### Changed
 
+- Default RGD-5 rolls use the full native fuse (zero prewarm), giving 1.5 seconds more reaction time after spawning. Applies to both the grenade wheel and single-grenade fallback.
 - Reworked the mod for **SPT 4.1.X**!
 - Outcomes are selected and tracked by the server for each player. Reward, purchase and jackpot decisions have protection against duplicate requests.
 - Server owners control luck, events, challenges and purchases.
@@ -58,6 +59,8 @@ Changes since the SPT 4.0.X release (v1.2.1).
 - More customizable notification messages.
 
 ### Changed
+
+
 - Now picks rarity first, then item inside it (feels way better imo)
 - Server/Fika sync should be more stable
 - Console is no longer yelling at you every raid

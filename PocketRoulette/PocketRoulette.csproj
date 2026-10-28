@@ -4,7 +4,7 @@
         <RootNamespace>PocketRoulette</RootNamespace>
         <AssemblyName>PocketRoulette</AssemblyName>
         <LangVersion>latest</LangVersion>
-        <Version>1.9.1</Version>
+        <Version>1.9.2</Version>
         <OutputPath>build/</OutputPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     </PropertyGroup>
@@ -178,8 +178,8 @@
             <LedgerAssets Include="$(OutputPath)assets/*.png" />
         </ItemGroup>
         <Copy SourceFiles="@(LedgerAssets)" DestinationFolder="$(PluginPath)/assets" ContinueOnError="false" />
-        <Delete Files="$(PluginPath)/PocketRoulette.Fika.dll" Condition="!Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')" />
-        <Delete Files="$(PluginPath)/PocketRoulette.Fika.pdb" Condition="!Exists('$(GamePath)/BepInEx/plugins/Fika/Fika.Core.dll')" />
+        <!-- The bundled bridge is deliberately inert without Fika. Preserve it
+             so a solo rebuild does not dismantle a combined installation. -->
         <Message Text="Client plugin copied successfully." Importance="high" />
     </Target>
 </Project>

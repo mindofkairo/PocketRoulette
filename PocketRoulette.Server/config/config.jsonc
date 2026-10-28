@@ -138,9 +138,9 @@
   // Templates sourced from https://api.tarkov.dev/api/v1/item?q=grenade&lang=en.
   // dangerous=true choices become less likely with luck; other choices become more likely.
   // tpl=existing throwable ID, name=warning label, weight=relative choice weight within this wheel.
-  // prewarmSeconds is fuse ALREADY spent, not the desired remaining fuse.
+  // prewarmSeconds is fuse ALREADY spent, not the desired remaining fuse. RGD-5 defaults to 0 for its full native fuse.
   "grenadeWheel": [
-    { "tpl": "5448be9a4bdc2dfd2f8b456a", "name": "RGD-5", "weight": 45, "dangerous": true, "prewarmSeconds": 1.5 },
+    { "tpl": "5448be9a4bdc2dfd2f8b456a", "name": "RGD-5", "weight": 45, "dangerous": true, "prewarmSeconds": 0 },
     { "tpl": "58d3db5386f77426186285a0", "name": "M67", "weight": 15, "dangerous": true, "prewarmSeconds": 0 },
     { "tpl": "5a0c27731526d80618476ac4", "name": "Zarya flashbang", "weight": 20, "dangerous": false, "prewarmSeconds": 0 },
     { "tpl": "617aa4dd8166f034d57de9c5", "name": "M18 green smoke", "weight": 20, "dangerous": false, "prewarmSeconds": 0 }
@@ -166,8 +166,8 @@
   "grenadeSpawnDelaySeconds": 0.75,
   // Fallback existing grenade template when the wheel is disabled/empty.
   "grenadeTpl": "5448be9a4bdc2dfd2f8b456a",
-  // Fuse already spent on the fallback grenade. Remaining fuse depends on the template.
-  "grenadeTimeSpentSeconds": 1.5,
+  // Fuse already spent on the fallback grenade. Default 0 gives RGD-5 its full native fuse for reaction time.
+  "grenadeTimeSpentSeconds": 0,
   // Ordinary grenade warnings. Tokens: {delay}, {grenade}.
   "grenadeMessages": [
     "A live grenade is about to land where you are standing. RUN!",

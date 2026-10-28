@@ -92,7 +92,7 @@ namespace PocketRoulette.Models
         public string GrenadeTpl { get; set; } = "5448be9a4bdc2dfd2f8b456a";
 
         [JsonProperty("grenadeTimeSpentSeconds")]
-        public float GrenadeTimeSpentSeconds { get; set; } = 1.5f;
+        public float GrenadeTimeSpentSeconds { get; set; } = 0f;
 
         [JsonProperty("grenadeMessages")]
         public List<string> GrenadeMessages { get; set; } = new List<string>();

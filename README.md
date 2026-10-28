@@ -1,90 +1,304 @@
-# Pocket Roulette
+> This page applies to SPT `4.1.X`. One download includes the client, server and Fika bridge for solo or Fika play. The `5.0.X` port is experimental and is a separate build.
+{.is-info}
+
+# Pocket Roulette {.tabset}
+
+## Overview
 
 Pocket Roulette turns the start of every raid into a tiny gambling problem. When you load in, the mod spins the wheel and tries to sneak random loot into your pockets. Sometimes it's a snack, sometimes it is ammo, sometimes it's something stupidly rare that makes your neurons go brr.
 
-Everything is configurable: reward chance, number of rolls, item weights, rarity modes, stack ranges, scav support, ground drops, and notification messages. Now there's personal luck, jackpots, challenges, extra spins, and the option to put a live grenade where you were standing. Run it as a balanced bonus system, a cursed slot machine, or a full chaos button for your server.
+Everything is configurable: reward chance, number of rolls, item weights, rarity modes, stack ranges, scav support, ground drops and notification messages. There's also personal luck, jackpots, challenges, extra spins, and the option to put a live grenade where you were standing. Run it as a balanced bonus system, a cursed slot machine, or a full chaos button for your server.
 
-Doesn't add any custom items, so you can uninstall without leaving custom item templates in your profile. I'm not trying to brick your profile or anything lol.
+Doesn't add any custom items, so uninstalling won't leave made-up item templates in your profile. I'm not trying to brick your profile or anything lol.
+
+**Solo and Fika supported. Live grenades are off by default.**
 
 Go spin the pocket wheel big man.
 
-### Features
+## Features
 
-- **Personal luck and bad-luck protection:** unlucky raid starts build up your own luck for future rolls. Better luck favours rare loot and jackpots and makes dangerous grenade outcomes less likely. Your squadmates have their own luck; nobody gets to steal yours. Caps and decay are configurable.
-- **Empty-pocket bonus:** load in with empty pockets for a temporary luck boost. Finally, a reward for forgetting to bring anything.
-- **Cursed jackpots:** a valuable item, a countdown, and a grenade. Grab the loot and move. Leave it too long and the unclaimed item disappears when the timer ends. Explosion delays are configurable, and turning live grenades off removes these too.
-- **Shared jackpots:** keep your main prize and give the squad gifts, or keep both prizes and let everyone judge you. Gifts use each teammate's own luck. Share/keep messages are configurable, with five of each by default.
-- **Lucky challenges:** sometimes you'll get a survival, travel or kill challenge for bonus spins. Default kill presets are three enemies of any type, three Scavs, one PMC, one kill under 25m, or one kill over 75m. Counts, enemy types and distance limits are configurable. Teammate kills don't count. You get assignment, progress and completion notifications, so you don't need to keep checking a quest menu. Requires the luck system to be enabled.
-- **Extra spins:** spend stash roubles for another go through the ledger, or choose automatic buy-ins in F12. Default price is 25,000 roubles, with a shared limit of two extra spins per PMC raid. Automatic buy-ins start at zero; if you choose a nonzero amount, it repeats each raid until you change it back.
-- **Grenade wheel:** optional RGD-5, M67, Zarya and M18 smoke rolls. The squad gets a warning before dangerous events. These are real grenades, so move your ass. Live grenades are **off by default**.
-- **Raid ledger:** see your luck, decay rules, stash balance and forty recent rolls, including their odds, luck, source and whether they reached your pockets, landed on the ground or were missed.
+### The original pocket casino
 
-Every feature has its own server config toggle. Turn on what sounds fun and leave the rest alone. Disabling luck also turns off bad-luck protection, empty-pocket luck and lucky challenges for everyone; saved luck is kept. Shared jackpots, purchases and enabled grenade events can still run at base odds. Disabling grenades removes both grenade-wheel rolls and cursed jackpots.
+Roll existing EFT items at raid start, with configurable rarity weights and stack sizes. If a reward doesn't fit, it drops at your feet by default. You can turn ground drops off if you'd rather miss the reward. Scav rolls are supported too.
 
-### Controls (Configurable)
+### Personal luck
 
-- **HOME:** open or close the raid ledger. Escape or the back button closes it too.
-- **F8:** share a jackpot. **F9:** keep it. Both keys are configurable in F12.
+Your luck belongs to you. Your squadmates have their own saved points, and being the host doesn't entitle them to yours.
 
-Jackpot prize details and the share/keep countdown stay on screen until you decide. Let the timer run out and you keep both prizes. Playing solo keeps both automatically.
+Luck affects raid-start rolls, paid spins and bonus rewards. Higher luck favours rare loot and jackpots and lowers the weight of dangerous grenade outcomes. Notifications show the luck used; the ledger keeps that value with the roll.
 
-The ledger closes after an extra-spin purchase. Opening it doesn't pause the raid, so maybe don't do your accounting in the middle of a gunfight.
+- **Bad-luck protection:** unlucky starting batches build stored luck for future raids. Caps, rare-win reductions and inactivity decay are configurable.
+- **Empty-pocket bonus:** start with empty pockets for a temporary boost. Finally, a reward for forgetting to bring anything.
 
-### Fika Compatibility
+Luck changes the wheel's weights. It doesn't change the separate chance for the starting wheel to run at all, and 10 luck does not mean every item has a 10% chance.
 
-Supports solo play and Fika. Each player rolls independently and keeps their own saved luck. Shared jackpots let the winner decide whether the squad gets gifts, and grenade warnings tell everyone who's about to become a problem.
+### Cursed jackpots
 
-### Installation / Updating
+A valuable item, a countdown, and a very good reason to stop standing still.
 
-This version is for **SPT 4.1.X**.
+You get an explanation first, then the prize appears and its timer starts. Grab it and move. Unclaimed loot disappears when the deadline ends; picking it up doesn't cancel the grenade. The default deadline is randomly chosen between **six and ten seconds**, with luck able to favour the longer end.
 
-Close the game and server, then copy the release's `BepInEx` and `SPT_Runtime` folders into your game install. Add the matching optional Fika bridge if you use Fika.
+Requires live grenades to be enabled. Server owners control the prize rarity, explanation time and explosion window.
 
-Keep the `assets` folder beside `PocketRoulette.dll`; that's where the ledger's artwork lives. Keep your existing server config and `data` folder when updating so you don't lose your settings or saved luck. Older JSON configs import automatically with backups.
+### Shared jackpots
 
-### Configuration
+Win an ultrarare main prize and decide what happens to the extra loot:
 
-Edit `SPT_Runtime/user/mods/PocketRoulette/config/config.jsonc` inside the game install. It's JSONC now, so the file has comments explaining what everything does. Feature toggles are right at the top.
+- **Share:** keep your main prize and give each eligible teammate their own gift, rolled using their luck.
+- **Keep:** take the main prize and the reserved bonus for yourself. Everyone gets to judge you.
 
-Stuff you'll probably touch:
+The default main prize is ultrarare; the kept bonus and squad gifts are rare or better. Prizes can land on the ground if they don't fit. The announcement and choice instructions stay visible throughout the decision window.
 
-- `mode`: `mixed`, `garbage`, `useful`, `jackpot`, or `chaos`
-- `itemCount`: how many times Pocket Roulette rolls at raid start
-- `chancePercent`: 0-100 chance that Pocket Roulette even does anything; zero disables roulette and purchases
-- `enableNotification`: show or hide ordinary reward notifications; actionable jackpot choices still appear
-- `debugLogging`: show detailed logs for troubleshooting
-- `allowClientOverrides`: lets players opt into their own BepInEx/F12 settings instead of the normal server roll settings
-- `allowGroundDrop`: true by default; if it doesn't fit in your pockets, drop it at your feet. Set false to skip overflow rewards instead
-- `scavEnabled`: let your scav also hit the pocket casino; paid spins are PMC only
-- `itemPool`: weighted list of existing EFT item template IDs
-- `itemPool.minCount` / `itemPool.maxCount`: stack amount range for that reward, clamped to the item's real max stack size
-- `enableLuck`: master switch for the luck system for ALL players. Each player still keeps their own saved points; turning it off pauses luck effects, gains/decay, empty-pocket bonuses and challenges
-- `enableBadLuckProtection` / `badLuckProtection`: requires luck; adjust points gained after unlucky raid starts, the stored cap, rare-win reduction and daily inactivity decay
-- `enableEmptyPocketBonus` / `emptyPocketBonus.luckPoints`: requires luck; temporary bonus for starting with empty pockets, default two points
-- `enableLuckyChallenges` / `luckyChallenges`: requires luck; default 30% assignment chance before luck adjustments, one bonus spin, and optional progress notices. Survival and walking targets are configurable too
-- `luckyChallenges.killPresets`: enable/disable each kill challenge, change `kills` and choose `targetType` (`any`, `scav`, `pmc`). AI USEC/BEAR count as PMCs even if their profile uses the Scav side; Raiders and Rogues stay Scav targets. Zero distance means no limit; positive `minDistanceMeters` / `maxDistanceMeters` mean strictly over/under that distance at the moment of the kill. An empty list disables kill presets
-- `enableSharedJackpots` / `sharedJackpots`: enable squad sharing, change the 20-second decision window, prize rarities and random share/keep message lists
-- `enableBuyInSpins` / `buyInSpins`: allow paid spins, set `priceRoubles` (25,000 by default) and `maxSpinsPerRaid` (two by default)
-- `enableGrenadeEvent`: master grenade switch, false by default. If false, neither the grenade wheel nor cursed jackpots can roll, even if their own switches are true
-- `enableGrenadeWheel` / `grenadeWheel`: requires grenades; configure types, weights and fuse prewarm. Turning just the wheel off uses the single `grenadeTpl` instead
-- `enableCursedJackpot` / `cursedJackpot`: requires grenades; configure the valuable prize and minimum/maximum explosion delays (six to ten seconds by default)
+You have **20 seconds** by default. A timeout keeps both prizes, and solo play keeps both automatically. Five share lines and five keep lines are included, all editable. Yes, the stingy bitch line is in there.
 
-Feature switches are server-wide and apply when each player's raid starts. Their saved luck values stay separate. Changing a parent switch doesn't erase your child settings, so you can turn it back on later without rebuilding your config. Existing explicit settings are kept when updating, including an older `allowGroundDrop: false`.
+### Lucky challenges
 
-You can also mess with all the funny messages it spits out if you're bored.
+Sometimes the wheel gives you a little extra thing to work towards during the raid. You get assignment, progress and completion notices; no new quest menu to babysit.
 
-By default the server config is the authority, which keeps Fika/multiplayer fair. Basically, the server and client need each other's consent for a player to use their own F12 config. If the server allows overrides, each client can still choose the server config or their own custom normal-roll settings. Luck, event rules, challenges and purchases stay controlled by the server.
+The default challenge pool includes:
 
-Client-side item pools and messages live in `BepInEx/plugins/PocketRoulette/PocketRoulette.ClientConfig.jsonc`.
+- Survive for five minutes.
+- Travel 750 metres.
+- Kill three enemies of any type.
+- Kill three Scavs.
+- Kill one PMC.
+- Get a kill from under 25 metres.
+- Get a kill from over 75 metres.
 
-### Modes
+The base assignment chance is **30%**, before luck adjustments. Completion awards one bonus spin by default. Those bonus spins give items; they don't chain into another grenade event or challenge.
 
-Modes pick a rarity tier first, then use each item's weight inside that rarity.
+Each kill preset can be changed or disabled. Teammate kills don't count. This feature requires luck to be enabled.
 
-- `mixed`: mostly trash and okay stuff, tiny chance for something actually good
-- `garbage`: you're eating crayons and loving it
-- `useful`: actually gives you decent stuff most of the time
-- `jackpot`: loaded dice for rich kids
-- `chaos`: every rarity starts with equal weight. Good luck dummy
+### Extra spins
 
-Personal luck adjusts those starting weights. Luck is measured in points, not percentages: 10 luck doesn't mean a flat 10% chance at every item. The ledger shows each roll's odds after applying its luck and active event weights, per spin that actually takes place. Older rolls keep their original odds even if your luck changes afterward.
+Spend **25,000 stash roubles** for another go through the raid ledger. Default limit: **two paid spins per PMC raid**. The menu closes after purchase, because you're still in a raid and your accountant is not bulletproof.
+
+You can also choose automatic buy-ins in the F12 settings. That selection starts at **zero**. If you set it to a nonzero number, it buys that many every PMC raid until you change it back. Ledger purchases and automatic buy-ins share the same limit. Scavs can't buy spins.
+
+### Grenade wheel
+
+Optional RGD-5, M67, Zarya and M18 green smoke outcomes. These use real game grenades, not an invisible damage button. The squad gets a warning before the hazard; nobody gets special immunity, so move your ass.
+
+The default RGD-5 uses its full native fuse, with prewarm set to zero.
+
+**Live grenades are off by default.** Turning the master grenade switch off removes cursed jackpots too. Turning only the wheel off uses the configured single grenade instead; that does not disable grenades.
+
+### Raid ledger
+
+Open the ledger to see current/stored luck, decay rules, stash balance and up to **40 recent rolls**. Each row records the item, quantity, odds, luck used, source and delivery result.
+
+Drag the header to move it. Adjust its scale in F12 from **0.25 to 1.25**; the default is **0.55**. Opening the ledger does not pause the raid.
+
+### Rarity modes
+
+| Mode | What you're signing up for |
+| --- | --- |
+| `mixed` | Mostly trash and okay stuff, with a small chance of something actually good. |
+| `garbage` | You're eating crayons and loving it. |
+| `useful` | Decent stuff more often. Very responsible gambling. |
+| `jackpot` | Loaded dice for rich kids. |
+| `chaos` | Every rarity starts with equal weight. Good luck dummy. |
+
+Modes choose a rarity tier, then use each item's weight within it. Personal luck adjusts those starting weights; enabled events also take their share of the wheel.
+
+## Controls
+
+| Default key | Action |
+| --- | --- |
+| `HOME` | Open or close the raid ledger. |
+| `Escape` | Close an open roulette menu. |
+| `F8` | Share when a shared-jackpot choice is open. |
+| `F9` | Keep both prizes when a choice is open. |
+| `F12` | Open client settings through BepInEx ConfigurationManager, if installed. |
+
+Ledger and jackpot bindings are configurable. The ledger's back button closes it too.
+
+Automatic buy-ins live under `Buy-In Spins` -> `Spins Per PMC Raid`. Leave this at zero if you only want to buy through the ledger.
+
+The developer testing menu is disabled in public builds. `END` does nothing in the release, and there isn't a config switch to turn the tools back on.
+
+## Install
+
+### Fresh install
+
+1. Download **Pocket Roulette for SPT 4.1.X**. The 4.0 and experimental 5.0 DLLs are different builds.
+2. Close the game and SPT server.
+3. Open the main archive and copy its `BepInEx` and `SPT_Runtime` folders into the folder containing `EscapeFromTarkov.exe`. Merge the folders when prompted. Don't put the entire archive inside another `PocketRoulette` folder.
+4. Keep both client DLLs together. The included Fika bridge activates when Fika is installed and is ignored when it isn't. No separate download or manual switch is needed.
+5. Start the server, then the game. Load into a raid and let the pocket gods do their thing.
+
+The resulting paths should include:
+
+```text
+[game folder]/BepInEx/plugins/PocketRoulette/PocketRoulette.dll
+[game folder]/BepInEx/plugins/PocketRoulette/PocketRoulette.Fika.dll
+[game folder]/BepInEx/plugins/PocketRoulette/assets/roubles.png
+[game folder]/SPT_Runtime/user/mods/PocketRoulette/PocketRoulette.Server.dll
+[game folder]/SPT_Runtime/user/mods/PocketRoulette/config/config.jsonc
+```
+
+Keep the **whole assets folder**, not just the currency image. Leave the included bridge beside the client DLL even if you play solo; it stays inactive without Fika.
+
+The server portion goes on the SPT server. Every participating player needs the client folder, including both DLLs and assets.
+
+### Updating from 4.0.X or an older build
+
+1. Back up your mod config and any existing Pocket Roulette data, then close the game/server.
+2. Remove the old Pocket Roulette DLLs before installing the matching new set. If you installed a DLL loose in `BepInEx/plugins`, remove that old copy too. Only keep one client plugin.
+3. Install the new client/server folders, keeping the bundled DLLs together. **Keep your existing server config and `data` folder.** If your archive tool asks to replace an existing config with the shipped default, skip that file.
+4. Start the server. Missing options and older JSON configs are migrated with backups. Existing explicit values are kept, including an older `allowGroundDrop: false`.
+5. Review the new feature switches at the top of `config.jsonc`, then restart/load a fresh raid for the settings you want.
+
+Client settings live at `[game folder]/BepInEx/config/com.kairo.pocketroulette.cfg`. Optional local item pools/messages live at `[game folder]/BepInEx/plugins/PocketRoulette/PocketRoulette.ClientConfig.jsonc`; that file is created after configuration is fetched in a raid.
+
+To use the new full-fuse RGD-5 setting with an older config, set its wheel entry's `prewarmSeconds` to `0`. If your single-grenade fallback is also RGD-5, set `grenadeTimeSpentSeconds` to `0` too. Existing custom fuse values aren't silently overwritten.
+
+### Uninstalling
+
+Close the game/server and remove the Pocket Roulette client folder, server mod folder and any old loose Pocket Roulette DLL. You can keep a backup of the server `config` and `data` folders if you might return. Your rewards are ordinary EFT items; there are no custom item templates to clean out.
+
+## Config Options
+
+Edit `[game folder]/SPT_Runtime/user/mods/PocketRoulette/config/config.jsonc`.
+
+It's JSONC, so comments explain the options. Feature switches are right at the top. Keep commas and quoted strings intact; comments are allowed, psychic punctuation is not.
+
+### Stuff you'll probably touch
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `mode` | `mixed` | Starting rarity distribution. See Features for the five modes. |
+| `itemCount` | `1` | Starting spins per raid, from 1 to 20. |
+| `chancePercent` | `100` | Chance the starting wheel runs. `0` disables roulette and purchases. |
+| `allowGroundDrop` | `true` | Drop ordinary rewards at your feet if they don't fit. Set false to miss overflow rewards. |
+| `scavEnabled` | `true` | Let your scav hit the pocket casino. Paid spins remain PMC only. |
+| `enableNotification` | `true` | Ordinary roulette notices. Actionable jackpot choices and group hazard alerts still appear. |
+| `allowClientOverrides` | `false` | Allow players to opt into local normal-roll settings. Both server permission and the player's F12 opt-in are required. |
+| `debugLogging` | `false` | Extra troubleshooting logs. |
+| `itemPool` | Shipped EFT pool | Existing item IDs, names, rarities and relative weights. No custom items are added. |
+| `itemPool.minCount` / `maxCount` | Per item | Reward stack range, limited by the real item's maximum stack size. |
+
+### Feature switches
+
+| Switch | Default | Dependency / effect |
+| --- | --- | --- |
+| `enableLuck` | `true` | Server-wide master luck switch; points are still saved separately for each player. |
+| `enableBadLuckProtection` | `true` | Requires luck. Builds stored points after unlucky starting batches. |
+| `enableEmptyPocketBonus` | `true` | Requires luck. Temporary bonus for starting with empty pockets. |
+| `enableLuckyChallenges` | `true` | Requires luck. Assigns ordinary-play challenges for bonus spins. |
+| `enableSharedJackpots` | `true` | Enables jackpot offers; solo play keeps both prizes. |
+| `enableBuyInSpins` | `true` | Permits paid spins. Automatic purchases still default to zero per player. |
+| `enableGrenadeEvent` | `false` | Master permission for live grenade outcomes. Off excludes the wheel and cursed jackpots. |
+| `enableGrenadeWheel` | `true` | Requires grenades. Off uses `grenadeTpl` instead of the wheel. |
+| `enableCursedJackpot` | `true` | Requires grenades. Enables timed valuable loot followed by an explosion. |
+
+Disabling luck pauses its effects, gains/decay, empty-pocket bonuses and challenge assignment/completion for everyone. Saved luck is kept. Shared jackpots, purchases and enabled grenade events remain available at base odds. Child settings stay in the config so you don't have to rebuild them when turning a feature back on.
+
+### Luck, challenges and jackpot tuning
+
+| Setting | Default | What it changes |
+| --- | --- | --- |
+| `luck.maxLuck` | `20` | Effective luck cap, including temporary bonuses. |
+| `luck.showAtRoll` | `true` | Show luck used in roll notifications. |
+| `badLuckProtection.gainPerUnluckyRaid` | `1` | Stored gain once per eligible unlucky starting batch; buying spins doesn't farm this. |
+| `badLuckProtection.maxStoredLuck` | `10` | Stored-point cap. |
+| `badLuckProtection.winDecayPercent` | `50` | Reduction after receiving a rare/ultrarare win, applied at most once per raid. |
+| `badLuckProtection.inactivityDecayPerDay` | `0.25` | Stored points lost per inactive real-world day, applied at the next raid start. `0` disables this decay. |
+| `emptyPocketBonus.luckPoints` | `2` | Temporary boost from the initial empty-pocket snapshot. |
+| `luckyChallenges.assignmentChancePercent` | `30` | Base assignment chance before luck adjustments. |
+| `luckyChallenges.bonusSpins` | `1` | Item-only spins for completing a challenge. |
+| `luckyChallenges.killPresets` | Five presets | Individual toggles, kill counts, enemy types and distance limits. An empty list removes kill challenges. |
+| `sharedJackpots.decisionSeconds` | `20` | Time to share or keep. |
+| `sharedJackpots.shareMessages` / `keepMessages` | Five each | Random decision lines. `{user}` or `(user)` inserts the winner's name. |
+| `buyInSpins.priceRoubles` | `25000` | Stash roubles per paid spin. |
+| `buyInSpins.maxSpinsPerRaid` | `2` | Combined automatic and ledger purchase limit. |
+
+Kill presets accept `targetType: "any"`, `"scav"` or `"pmc"`. AI PMCs count as PMCs; Raiders and Rogues count as Scav targets here. A zero distance bound means no limit. Positive `minDistanceMeters` / `maxDistanceMeters` mean strictly over/under that distance, measured when the enemy dies. Exactly 25m does not satisfy "under 25m."
+
+### Grenade settings
+
+| Setting | Default | What it changes |
+| --- | --- | --- |
+| `grenadeSpawnDelaySeconds` | `0.75` | Warning delay before an ordinary grenade appears at the roll location. |
+| `grenadeWheel` | Four choices | Existing grenade IDs, weights, danger flag and fuse prewarm. |
+| `grenadeTpl` | RGD-5 | Single-grenade fallback when the wheel is disabled. |
+| `grenadeTimeSpentSeconds` | `0` | Fuse already spent on the fallback grenade. |
+| `cursedJackpot.minExplosionDelaySeconds` / `maxExplosionDelaySeconds` | `6` / `10` | Cursed deadline after the explanation and prize placement. |
+| `cursedJackpot.explanationSeconds` | `2` | Time to read the explanation before the cursed timer starts. |
+
+**Prewarm means fuse already used up.** Increasing it makes the grenade explode sooner, not later. Leave RGD-5 at zero if you want its full native fuse. Cursed countdowns have their own timing settings.
+
+### What players can change
+
+Keys, ledger scale and automatic buy-in count are personal settings. Normal roll overrides additionally require `allowClientOverrides: true` on the server and `Allow Client Config` enabled in that player's F12 settings. Local pools/messages use `PocketRoulette.ClientConfig.jsonc` beside the client DLL.
+
+Luck, events, challenges and purchase rules remain controlled by the server. Most raid settings are captured at raid start, so edit them between raids and use a fresh raid when checking a change.
+
+## Fika
+
+Each player rolls independently and has their own saved luck. Shared jackpots let the winner decide whether the squad gets gifts, and hazard warnings tell everyone who's about to become a problem.
+
+### What to install
+
+- Put the server DLL/config on the **SPT server**.
+- Every participating game client, including the hosting client, needs the **client folder with both DLLs and assets**.
+- **The Fika bridge is included in the main download.** It activates automatically when Fika is installed; solo players leave it in place and it is ignored.
+
+Keep the client and bridge versions matched by updating the whole folder together. If you accidentally delete the bridge or mix versions while using Fika, Pocket Roulette skips rolls and reports the problem rather than creating unsynchronized loot.
+
+### A few things to know
+
+- Share/keep choices use the configured keys, default F8/F9. Gifts go to eligible squadmates in the raid, not everyone with a profile on the server.
+- The winner keeps the main prize either way. Sharing trades their reserved bonus for personal gifts to the squad; it doesn't clone the winner's exact item for everyone.
+- Group hazard alerts do not grant immunity. These are normal game grenades with normal damage.
+- Luck and feature switches are server-owned. Each player can still choose their keys, ledger scale and whether to buy automatic spins.
+
+This release's Fika integration is for **SPT 4.1.X**. The experimental 5.0 build has its integration disabled; don't carry this bridge into that install.
+
+## FAQ
+
+### Can I turn the grenades off?
+
+Yes. They're already off in a fresh config. Set `enableGrenadeEvent` to `false` and neither the grenade wheel nor cursed jackpots can roll. You can keep all the normal loot, luck and jackpot features.
+
+### Why did a grenade go off so fast?
+
+Check prewarm. It means time already spent on the fuse. The current RGD-5 default is zero, but updates preserve old config values. See Install for the two settings to check if you're upgrading.
+
+### My F12 settings aren't changing the rolls.
+
+The server is in charge by default. It must allow client overrides, and you must opt into them. Event, luck, challenge and purchase rules stay server-owned even then. Try a new raid after changing settings.
+
+### Why do current luck and the luck beside an old roll differ?
+
+The row remembers what the wheel used at the time. A later rare win or decay can change your current value. The odds in that row also stay tied to the original roll.
+
+### Why isn't an item's percentage just the raid chance?
+
+`chancePercent` decides whether the starting wheel runs. The ledger's percentage is that item's selection chance on a spin that takes place, including its luck-adjusted rarity, item weights and competing events. It doesn't multiply in the starting activation chance or the chance of a particular stack amount.
+
+### I got a shared jackpot while playing solo. Where's my choice?
+
+You keep both prizes automatically when no eligible teammates are present. There's nobody to disappoint. With a squad, the choice defaults to keep if you let the timer expire.
+
+### Does buying a spin guarantee something good?
+
+No. You're buying a spin, not good judgement. Paid spins use the normal selection rules, and can miss or select an enabled event. Turning the starting chance down doesn't make paid spins cheaper; a starting chance of zero disables purchases entirely.
+
+### I lost a spin because my pockets were full.
+
+With `allowGroundDrop: true`, ordinary overflow rewards should appear at your feet. Existing configs keep their old value, so check that setting before blaming the pocket gods. Ground loot can still be missed if you don't pick it up.
+
+### Does this add custom items or need a profile wipe?
+
+No custom items and no wipe required by the mod. Rewards use existing EFT templates. Back up your profile and mod settings before updating, as you normally would.
+
+### Where's the END testing menu?
+
+Disabled in the public DLLs. The source retains it for development, but turning on debug logging or editing a config can't bring it back. HOME is the normal player ledger.
+
+### Something isn't working. What should I include in a report?
+
+SPT version, Pocket Roulette version, whether you use Fika, whether you were host or guest, what happened, and the relevant server/BepInEx log lines. Include the settings involved and whether the reward appeared in pockets, on the ground or nowhere. "It broke" gives me roughly as much to work with as an empty Slickers wrapper.
+
+{.endtabset}
