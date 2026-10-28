@@ -1,6 +1,3 @@
-> This page applies to SPT `4.1.X`. One download includes the client, server and Fika bridge for solo or Fika play. The `5.0.X` port is experimental and is a separate build.
-{.is-info}
-
 # Pocket Roulette {.tabset}
 
 ## Overview
@@ -106,62 +103,41 @@ Modes choose a rarity tier, then use each item's weight within it. Personal luck
 | Default key | Action |
 | --- | --- |
 | `HOME` | Open or close the raid ledger. |
-| `Escape` | Close an open roulette menu. |
 | `F8` | Share when a shared-jackpot choice is open. |
 | `F9` | Keep both prizes when a choice is open. |
-| `F12` | Open client settings through BepInEx ConfigurationManager, if installed. |
 
-Ledger and jackpot bindings are configurable. The ledger's back button closes it too.
-
-Automatic buy-ins live under `Buy-In Spins` -> `Spins Per PMC Raid`. Leave this at zero if you only want to buy through the ledger.
-
-The developer testing menu is disabled in public builds. `END` does nothing in the release, and there isn't a config switch to turn the tools back on.
+Ledger and jackpot bindings are configurable.
 
 ## Install
 
 ### Fresh install
 
-1. Download **Pocket Roulette for SPT 4.1.X**. The 4.0 and experimental 5.0 DLLs are different builds.
+1. Download **Pocket Roulette for SPT 4.1.X**.
 2. Close the game and SPT server.
-3. Open the main archive and copy its `BepInEx` and `SPT_Runtime` folders into the folder containing `EscapeFromTarkov.exe`. Merge the folders when prompted. Don't put the entire archive inside another `PocketRoulette` folder.
-4. Keep both client DLLs together. The included Fika bridge activates when Fika is installed and is ignored when it isn't. No separate download or manual switch is needed.
-5. Start the server, then the game. Load into a raid and let the pocket gods do their thing.
+3. Open the main archive and copy its `BepInEx` and `SPT_Runtime` folders into the folder containing `EscapeFromTarkov.exe`. Merge/replace the folders if prompted. Don't put the entire archive inside another `PocketRoulette` folder.
+4. Start the server, then the game. Load into a raid and let the pocket gods do their thing.
 
 The resulting paths should include:
 
 ```text
 [game folder]/BepInEx/plugins/PocketRoulette/PocketRoulette.dll
-[game folder]/BepInEx/plugins/PocketRoulette/PocketRoulette.Fika.dll
 [game folder]/BepInEx/plugins/PocketRoulette/assets/roubles.png
 [game folder]/SPT_Runtime/user/mods/PocketRoulette/PocketRoulette.Server.dll
 [game folder]/SPT_Runtime/user/mods/PocketRoulette/config/config.jsonc
 ```
 
-Keep the **whole assets folder**, not just the currency image. Leave the included bridge beside the client DLL even if you play solo; it stays inactive without Fika.
+The server portion goes on the SPT server. Every participating player needs the client plugin, assets and matching bridge when using Fika.
 
-The server portion goes on the SPT server. Every participating player needs the client folder, including both DLLs and assets.
-
-### Updating from 4.0.X or an older build
-
-1. Back up your mod config and any existing Pocket Roulette data, then close the game/server.
-2. Remove the old Pocket Roulette DLLs before installing the matching new set. If you installed a DLL loose in `BepInEx/plugins`, remove that old copy too. Only keep one client plugin.
-3. Install the new client/server folders, keeping the bundled DLLs together. **Keep your existing server config and `data` folder.** If your archive tool asks to replace an existing config with the shipped default, skip that file.
-4. Start the server. Missing options and older JSON configs are migrated with backups. Existing explicit values are kept, including an older `allowGroundDrop: false`.
-5. Review the new feature switches at the top of `config.jsonc`, then restart/load a fresh raid for the settings you want.
-
-Client settings live at `[game folder]/BepInEx/config/com.kairo.pocketroulette.cfg`. Optional local item pools/messages live at `[game folder]/BepInEx/plugins/PocketRoulette/PocketRoulette.ClientConfig.jsonc`; that file is created after configuration is fetched in a raid.
-
-To use the new full-fuse RGD-5 setting with an older config, set its wheel entry's `prewarmSeconds` to `0`. If your single-grenade fallback is also RGD-5, set `grenadeTimeSpentSeconds` to `0` too. Existing custom fuse values aren't silently overwritten.
 
 ### Uninstalling
 
-Close the game/server and remove the Pocket Roulette client folder, server mod folder and any old loose Pocket Roulette DLL. You can keep a backup of the server `config` and `data` folders if you might return. Your rewards are ordinary EFT items; there are no custom item templates to clean out.
+Close the game/server and remove the Pocket Roulette client folder, server mod folder and any old loose Pocket Roulette DLL. You can keep a backup of the server `config` and `data` folders if you might return. Your rewards are ordinary EFT items by default; there should be no custom item templates to clean out.
 
 ## Config Options
 
 Edit `[game folder]/SPT_Runtime/user/mods/PocketRoulette/config/config.jsonc`.
 
-It's JSONC, so comments explain the options. Feature switches are right at the top. Keep commas and quoted strings intact; comments are allowed, psychic punctuation is not.
+It's JSONC, so comments explain the options. (theres a lot..) Feature switches are right at the top. Keep commas and quoted strings intact.
 
 ### Stuff you'll probably touch
 
@@ -240,11 +216,10 @@ Each player rolls independently and has their own saved luck. Shared jackpots le
 
 ### What to install
 
-- Put the server DLL/config on the **SPT server**.
-- Every participating game client, including the hosting client, needs the **client folder with both DLLs and assets**.
-- **The Fika bridge is included in the main download.** It activates automatically when Fika is installed; solo players leave it in place and it is ignored.
+- Every participating game client needs the **client plugin and assets**.
+- Every Fika game client, including the hosting client, also needs the **matching `PocketRoulette.Fika.dll`** from the optional bridge.
 
-Keep the client and bridge versions matched by updating the whole folder together. If you accidentally delete the bridge or mix versions while using Fika, Pocket Roulette skips rolls and reports the problem rather than creating unsynchronized loot.
+Keep the client and bridge versions matched. If Fika is detected but the bridge is missing or incompatible, Pocket Roulette skips rolls and reports the problem rather than creating unsynchronized loot.
 
 ### A few things to know
 
@@ -253,7 +228,7 @@ Keep the client and bridge versions matched by updating the whole folder togethe
 - Group hazard alerts do not grant immunity. These are normal game grenades with normal damage.
 - Luck and feature switches are server-owned. Each player can still choose their keys, ledger scale and whether to buy automatic spins.
 
-This release's Fika integration is for **SPT 4.1.X**. The experimental 5.0 build has its integration disabled; don't carry this bridge into that install.
+This release's Fika integration is for **SPT 4.1.X**.
 
 ## FAQ
 
@@ -292,10 +267,6 @@ With `allowGroundDrop: true`, ordinary overflow rewards should appear at your fe
 ### Does this add custom items or need a profile wipe?
 
 No custom items and no wipe required by the mod. Rewards use existing EFT templates. Back up your profile and mod settings before updating, as you normally would.
-
-### Where's the END testing menu?
-
-Disabled in the public DLLs. The source retains it for development, but turning on debug logging or editing a config can't bring it back. HOME is the normal player ledger.
 
 ### Something isn't working. What should I include in a report?
 
