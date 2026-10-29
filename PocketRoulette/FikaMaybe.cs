@@ -28,7 +28,7 @@ namespace PocketRoulette
             if (_checked) return;
             _checked = true;
             _installed = AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == "Fika.Core")
-                || Chainloader.PluginInfos.Keys.Any(id => id.IndexOf("fika", StringComparison.OrdinalIgnoreCase) >= 0)
+                || Chainloader.PluginInfos.ContainsKey("com.fika.core")
                 || HasFikaAssembly();
             if (!_installed) return;
             try
