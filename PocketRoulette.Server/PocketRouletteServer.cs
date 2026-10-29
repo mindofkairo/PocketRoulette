@@ -13,7 +13,7 @@ public record ModMetadata : IModMetadata
     public string Name { get; init; } = "Pocket Roulette (Server)";
     public string Author { get; init; } = "kairo";
     public SemanticVersioning.Version Version { get; init; } = new("1.9.3");
-    public Range SptVersion { get; init; } = new(">=4.1.0 <4.2.0");
+    public Range SptVersion { get; init; } = new("~4.1.0");
     public string License { get; init; } = "MIT";
     public bool HasPrepatcher { get; init; } = false;
     public Dictionary<string, Range>? ModDependencies { get; init; }
