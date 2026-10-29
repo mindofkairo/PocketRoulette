@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Corrected Fika detection when another mod has a Fika addon installed without Fika itself. Pocket Roulette now checks the actual Fika plugin ID instead of any plugin ID containing "fika". This prevents loading its Fika bridge with a missing dependency, which could disrupt other mods' startup/type scans. The bridge can still be bundled for solo and Fika players.
+- Corrected Fika detection
 
 ## v1.9.2 - SPT 4.1.X update
 
